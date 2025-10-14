@@ -1,0 +1,11 @@
+## ⚙️ 2. `requirements.txt`
+
+```txt
+fastapi
+uvicorn
+sentence-transformers
+faiss-cpu
+pydantic
+groq
+numpy
+python-dotenv

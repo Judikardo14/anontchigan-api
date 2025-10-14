@@ -1,0 +1,21 @@
+# Environnements Python
+__pycache__/
+*.pyc
+
+# Configuration locale
+.env
+*.db
+*.sqlite
+
+# Données et modèles volumineux
+*.json
+*.pt
+*.bin
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Autres
+*.log
