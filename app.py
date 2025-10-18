@@ -27,9 +27,6 @@ class Query(BaseModel):
     question: str
 
 # Servir la page d'accueil
-@app.get("/")
-async def serve_home():
-    return FileResponse("index.html")
 
 # Endpoint de santé
 @app.get("/health")
@@ -475,8 +472,6 @@ if not USE_GROQ:
     print("   4. Installez : pip install groq")
 print("="*50 + "\n")
 
-if __name__ == "__main__":
-    print("💫 Démarrage du serveur...")
-    print("🌐 Interface: http://localhost:8000\n")
-    import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+@app.get("/")
+def root():
+    return {"message": "Hello from Render!"}
