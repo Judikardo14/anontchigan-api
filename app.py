@@ -97,7 +97,7 @@ print(f"✓ {len(questions_data)} questions chargées")
 # INITIALISATION EMBEDDINGS + FAISS
 # ============================================
 print("🔍 Initialisation des embeddings...")
-embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
 print("✓ Modèle d'embeddings chargé")
 
 print("📊 Création de l'index FAISS...")
