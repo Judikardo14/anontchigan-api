@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import logging
 from typing import Dict, List, Optional
 import random
@@ -7,7 +8,6 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 import streamlit as st
-from streamlit.components.v1 import html
 
 # ============================================
 # CONFIGURATION
@@ -398,21 +398,40 @@ def load_services():
     logger.info("✓ Services chargés")
     return groq, rag
 
-groq_service, rag_service = load_services()
+# ============================================
+# DÉTECTION MODE API
+# ============================================
 
-# ============================================
-# MODE API : Détection et traitement
-# ============================================
+# Désactiver tous les éléments visuels Streamlit
+st.set_page_config(
+    page_title="ANONTCHIGAN API",
+    page_icon="💗",
+    layout="centered"
+)
 
 # Récupérer les paramètres URL
 query_params = st.query_params
 
-# Vérifier si c'est un appel API
+# MODE API : Renvoie uniquement du JSON
 if "question" in query_params and query_params.get("format") == "json":
+    # Masquer complètement l'interface Streamlit
+    st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .stApp {background-color: white;}
+        .block-container {padding: 0 !important; max-width: 100% !important;}
+    </style>
+    """, unsafe_allow_html=True)
+    
     question = query_params.get("question")
     user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
     
     try:
+        # Charger les services
+        groq_service, rag_service = load_services()
+        
         # Traiter la question
         result = process_question(question, [], groq_service, rag_service)
         
@@ -421,253 +440,86 @@ if "question" in query_params and query_params.get("format") == "json":
             "answer": result["answer"],
             "method": result["method"],
             "similarity_score": result["score"],
-            "user_id": user_id
+            "user_id": user_id,
+            "question": question
         }
-        
-        # Retourner UNIQUEMENT du JSON pur sans interface Streamlit
-        st.write("")  # Force le rendu
-        
-        # Injection de JSON dans un composant HTML invisible
-        json_response = json.dumps(response_data, ensure_ascii=False)
-        html(f"""
-        <script>
-            // Afficher le JSON dans la console
-            console.log({json_response});
-            
-            // Afficher le JSON dans le body
-            document.body.innerHTML = '<pre>{json_response}</pre>';
-        </script>
-        """, height=0)
-        
-        # Afficher aussi dans Streamlit pour débug
-        st.json(response_data)
-        st.stop()
         
     except Exception as e:
-        error_data = {
+        response_data = {
             "success": False,
             "error": str(e),
-            "user_id": user_id
+            "user_id": user_id,
+            "question": question
         }
-        st.json(error_data)
-        st.stop()
+    
+    # Afficher UNIQUEMENT le JSON
+    st.code(json.dumps(response_data, ensure_ascii=False, indent=2), language="json")
+    
+    # Bouton pour copier
+    st.download_button(
+        label="📋 Télécharger la réponse JSON",
+        data=json.dumps(response_data, ensure_ascii=False, indent=2),
+        file_name="response.json",
+        mime="application/json"
+    )
+    
+    st.stop()
 
 # ============================================
-# INTERFACE STREAMLIT NORMALE
+# INTERFACE STREAMLIT NORMALE (si pas en mode API)
 # ============================================
 
-st.set_page_config(
-    page_title="ANONTCHIGAN API",
-    page_icon="💗",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+groq_service, rag_service = load_services()
 
-# CSS personnalisé
 st.markdown("""
-<style>
-    .main-header {
-        text-align: center;
-        padding: 1rem;
-        background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-    }
-    .stat-box {
-        background: #f0f2f6;
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-    }
-    .api-info {
-        background: #e8f4f8;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #0066cc;
-        margin-bottom: 1rem;
-    }
-    .api-code {
-        background: #f5f5f5;
-        padding: 10px;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 0.85em;
-        overflow-x: auto;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Header
-st.markdown("""
-<div class="main-header">
-    <h1>💗 ANONTCHIGAN</h1>
+<div style="text-align: center; padding: 2rem;">
+    <h1>💗 ANONTCHIGAN API</h1>
     <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar
-with st.sidebar:
-    st.header("ℹ️ Informations")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{len(rag_service.questions_data)}</h3>
-            <p>Questions</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        groq_status = "✅ Activé" if groq_service.available else "❌ Désactivé"
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{groq_status}</h3>
-            <p>Groq AI</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Documentation API
-    st.markdown("### 🔗 Utiliser en API")
-    
-    try:
-        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
-    except:
-        app_url = "https://votre-app.streamlit.app"
-    
-    st.markdown(f"""
-    <div class="api-info">
-        <h4>📝 Format de requête GET</h4>
-        <div class="api-code">
-{app_url}/?question=Votre+question&format=json
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="api-info">
-        <h4>🐍 Exemple Python</h4>
-        <div class="api-code">
-import requests<br>
-import urllib.parse<br>
-<br>
-url = "{URL}"<br>
-question = "Symptômes cancer sein"<br>
-params = {<br>
-&nbsp;&nbsp;"question": question,<br>
-&nbsp;&nbsp;"format": "json"<br>
-}<br>
-<br>
-response = requests.get(url, params=params)<br>
-data = response.json()<br>
-print(data['answer'])
-        </div>
-    </div>
-    """.replace("{URL}", app_url), unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="api-info">
-        <h4>📋 Exemple JavaScript</h4>
-        <div class="api-code">
-const url = "{URL}";<br>
-const question = "Symptômes cancer sein";<br>
-<br>
-fetch(`${url}/?question=${encodeURIComponent(question)}&format=json`)<br>
-&nbsp;&nbsp;.then(res => res.json())<br>
-&nbsp;&nbsp;.then(data => console.log(data.answer));
-        </div>
-    </div>
-    """.replace("{URL}", app_url), unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("""
-    ### 👥 Créateurs
-    - Judicaël Karol DOBOEVI
-    - Ursus Hornel GBAGUIDI
-    - Abel Kokou KPOCOUTA
-    - Josaphat ADJELE
-    
-    **Club d'IA - ENSGMM Abomey**
-    """)
-    
-    if st.button("🔄 Réinitialiser la conversation"):
-        st.session_state.messages = []
-        st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
-        st.session_state.conversation_history = []
-        st.rerun()
+st.info("""
+### 🔗 Utiliser l'API en mode JSON
 
-# Initialisation de la session
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+Pour obtenir une réponse en JSON pur, ajoutez `?format=json&question=VotreQuestion` à l'URL.
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
+**Exemple:**
+```
+https://votre-app.streamlit.app/?format=json&question=Symptômes+cancer+sein
+```
+""")
 
-if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
+# Interface de test
+st.markdown("### 🧪 Tester l'API")
 
-# Afficher l'historique des messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+test_question = st.text_input("Entrez une question pour tester:", placeholder="Ex: Quels sont les symptômes du cancer du sein ?")
 
-# Input utilisateur
-if question := st.chat_input("Posez votre question sur le cancer du sein..."):
-    # Ajouter la question de l'utilisateur
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
-    
-    # Traiter la question
-    with st.chat_message("assistant"):
-        with st.spinner("Je réfléchis..."):
+if st.button("🚀 Tester"):
+    if test_question:
+        with st.spinner("Traitement..."):
             try:
-                result = process_question(
-                    question, 
-                    st.session_state.conversation_history,
-                    groq_service,
-                    rag_service
-                )
+                result = process_question(test_question, [], groq_service, rag_service)
                 
-                answer = result["answer"]
-                method = result["method"]
-                score = result["score"]
+                response_data = {
+                    "success": True,
+                    "answer": result["answer"],
+                    "method": result["method"],
+                    "similarity_score": result["score"],
+                    "question": test_question
+                }
                 
-                # Afficher la réponse
-                st.markdown(answer)
-                
-                # Afficher les métadonnées (optionnel)
-                with st.expander("ℹ️ Détails de la réponse"):
-                    st.write(f"**Méthode:** {method}")
-                    if score is not None:
-                        st.write(f"**Score de similarité:** {score:.3f}")
-                    st.write(f"**User ID:** {st.session_state.user_id}")
-                
-                # Ajouter à l'historique
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-                
-                # Mettre à jour l'historique de conversation
-                st.session_state.conversation_history.append({"role": "user", "content": question})
-                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
-                
-                # Limiter l'historique
-                if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
-                    st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
+                st.success("✅ Réponse générée !")
+                st.json(response_data)
                 
             except Exception as e:
-                error_message = f"❌ Erreur: {str(e)}"
-                st.error(error_message)
-                logger.error(error_message)
+                st.error(f"❌ Erreur: {str(e)}")
+    else:
+        st.warning("⚠️ Veuillez entrer une question")
 
-# Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v2.4.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
-    <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+    <p>ANONTCHIGAN v3.0.0 - Mode API JSON</p>
+    <p>Développé par le Club d'IA de l'ENSGMM 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
