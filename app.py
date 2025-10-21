@@ -409,46 +409,59 @@ def load_services():
 groq_service, rag_service = load_services()
 
 # ============================================
-# GESTION DES PARAMÈTRES URL
+# GESTION DES PARAMÈTRES URL - VERSION CORRIGÉE
 # ============================================
 
-# Vérifier si c'est un appel API via les query params
-query_params = st.query_params
 
-if "api" in query_params and query_params["api"] == "true":
-    # MODE API - Pas d'interface, juste réponse JSON
-    if "question" in query_params:
-        question = query_params["question"]
-        user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
+# Récupérer les paramètres de l'URL
+try:
+    # Méthode compatible avec Streamlit récent
+    query_params = st.query_params
+    
+    # Vérifier si c'est un appel API
+    if query_params.get("api") == "true":
+        question = query_params.get("question")
         
-        try:
-            result = process_question(question, [], groq_service, rag_service)
+        if question:
+            user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
             
-            response_data = {
-                "success": True,
-                "answer": result["answer"],
-                "method": result["method"],
-                "similarity_score": result["score"],
-                "user_id": user_id
-            }
-            
-            st.json(response_data)
-            st.stop()
-            
-        except Exception as e:
-            error_data = {
+            try:
+                result = process_question(question, [], groq_service, rag_service)
+                
+                response_data = {
+                    "success": True,
+                    "answer": result["answer"],
+                    "method": result["method"],
+                    "similarity_score": result["score"],
+                    "user_id": user_id
+                }
+                
+                # Retourner le JSON et arrêter l'exécution
+                st.json(response_data)
+                st.stop()
+                
+            except Exception as e:
+                error_data = {
+                    "success": False,
+                    "error": str(e),
+                    "user_id": user_id
+                }
+                st.json(error_data)
+                st.stop()
+        else:
+            st.json({
                 "success": False,
-                "error": str(e),
-                "user_id": user_id
-            }
-            st.json(error_data)
+                "error": "Paramètre 'question' manquant"
+            })
             st.stop()
-    else:
-        st.json({
-            "success": False,
-            "error": "Paramètre 'question' manquant"
-        })
-        st.stop()
+            
+except Exception as e:
+    # Si erreur avec query_params, continuer normalement
+    logger.warning(f"Erreur query_params: {e}")
+    pass
+
+# SI ON ARRIVE ICI, C'EST QUE CE N'EST PAS UN APPEL API
+# L'interface normale Streamlit s'affiche ci-dessous...
 
 # ============================================
 # INTERFACE STREAMLIT NORMALE
