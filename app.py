@@ -7,12 +7,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 import streamlit as st
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import uvicorn
-import threading
-import time
+from streamlit.components.v1 import html
 
 # ============================================
 # CONFIGURATION
@@ -29,22 +24,6 @@ class Config:
     MAX_ANSWER_LENGTH = 600
     FAISS_RESULTS_COUNT = 3
     MIN_ANSWER_LENGTH = 30
-
-# ============================================
-# MODÈLES PYDANTIC POUR FASTAPI
-# ============================================
-
-class QuestionRequest(BaseModel):
-    question: str
-    user_id: Optional[str] = None
-    history: Optional[List[Dict[str, str]]] = []
-
-class QuestionResponse(BaseModel):
-    success: bool
-    answer: str
-    method: str
-    similarity_score: Optional[float]
-    user_id: str
 
 # ============================================
 # SERVICE GROQ
@@ -422,85 +401,59 @@ def load_services():
 groq_service, rag_service = load_services()
 
 # ============================================
-# CRÉATION DE L'API FASTAPI
+# MODE API : Détection et traitement
 # ============================================
 
-api = FastAPI(title="ANONTCHIGAN API", version="2.3.0")
+# Récupérer les paramètres URL
+query_params = st.query_params
 
-# Configuration CORS - TRÈS PERMISSIVE
-api.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Permet toutes les origines
-    allow_credentials=True,
-    allow_methods=["*"],  # Permet toutes les méthodes (GET, POST, etc.)
-    allow_headers=["*"],  # Permet tous les headers
-)
-
-@api.get("/")
-async def root():
-    """Endpoint racine"""
-    return {
-        "message": "ANONTCHIGAN API - Sensibilisation cancer du sein 🇧🇯",
-        "version": "2.3.0",
-        "endpoints": {
-            "POST /chat": "Poser une question",
-            "GET /health": "Vérifier le statut"
-        }
-    }
-
-@api.get("/health")
-async def health():
-    """Vérification de santé de l'API"""
-    return {
-        "status": "healthy",
-        "groq_available": groq_service.available,
-        "questions_count": len(rag_service.questions_data)
-    }
-
-@api.post("/chat", response_model=QuestionResponse)
-async def chat(request: QuestionRequest):
-    """Endpoint principal pour poser des questions"""
+# Vérifier si c'est un appel API
+if "question" in query_params and query_params.get("format") == "json":
+    question = query_params.get("question")
+    user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
+    
     try:
-        # Générer user_id si non fourni
-        user_id = request.user_id or f"user_{random.randint(1000, 9999)}"
-        
         # Traiter la question
-        result = process_question(
-            request.question,
-            request.history or [],
-            groq_service,
-            rag_service
-        )
+        result = process_question(question, [], groq_service, rag_service)
         
-        return QuestionResponse(
-            success=True,
-            answer=result["answer"],
-            method=result["method"],
-            similarity_score=result["score"],
-            user_id=user_id
-        )
+        response_data = {
+            "success": True,
+            "answer": result["answer"],
+            "method": result["method"],
+            "similarity_score": result["score"],
+            "user_id": user_id
+        }
+        
+        # Retourner UNIQUEMENT du JSON pur sans interface Streamlit
+        st.write("")  # Force le rendu
+        
+        # Injection de JSON dans un composant HTML invisible
+        json_response = json.dumps(response_data, ensure_ascii=False)
+        html(f"""
+        <script>
+            // Afficher le JSON dans la console
+            console.log({json_response});
+            
+            // Afficher le JSON dans le body
+            document.body.innerHTML = '<pre>{json_response}</pre>';
+        </script>
+        """, height=0)
+        
+        # Afficher aussi dans Streamlit pour débug
+        st.json(response_data)
+        st.stop()
         
     except Exception as e:
-        logger.error(f"Erreur API: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_data = {
+            "success": False,
+            "error": str(e),
+            "user_id": user_id
+        }
+        st.json(error_data)
+        st.stop()
 
 # ============================================
-# LANCEMENT DE FASTAPI EN ARRIÈRE-PLAN
-# ============================================
-
-def run_fastapi():
-    """Lance FastAPI sur le port 8000"""
-    uvicorn.run(api, host="0.0.0.0", port=8000, log_level="warning")
-
-# Démarrer FastAPI une seule fois
-if "fastapi_started" not in st.session_state:
-    threading.Thread(target=run_fastapi, daemon=True).start()
-    st.session_state.fastapi_started = True
-    time.sleep(2)  # Attendre que FastAPI démarre
-    logger.info("✓ FastAPI lancée sur http://localhost:8000")
-
-# ============================================
-# CONFIGURATION STREAMLIT
+# INTERFACE STREAMLIT NORMALE
 # ============================================
 
 st.set_page_config(
@@ -548,7 +501,7 @@ st.markdown("""
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>💗 ANONTCHIGAN API</h1>
+    <h1>💗 ANONTCHIGAN</h1>
     <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
@@ -578,22 +531,18 @@ with st.sidebar:
     st.markdown("---")
     
     # Documentation API
-    st.markdown("### 🔗 API REST (FastAPI)")
+    st.markdown("### 🔗 Utiliser en API")
     
-    st.markdown("""
-    <div class="api-info">
-        <h4>✅ API démarrée sur le port 8000</h4>
-        <p><strong>Base URL locale :</strong> http://localhost:8000</p>
-    </div>
-    """, unsafe_allow_html=True)
+    try:
+        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
+    except:
+        app_url = "https://votre-app.streamlit.app"
     
-    st.markdown("""
+    st.markdown(f"""
     <div class="api-info">
-        <h4>📝 Exemple cURL</h4>
+        <h4>📝 Format de requête GET</h4>
         <div class="api-code">
-curl -X POST http://localhost:8000/chat \\<br>
-&nbsp;&nbsp;-H "Content-Type: application/json" \\<br>
-&nbsp;&nbsp;-d '{"question": "Symptômes cancer sein"}'
+{app_url}/?question=Votre+question&format=json
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -602,31 +551,36 @@ curl -X POST http://localhost:8000/chat \\<br>
     <div class="api-info">
         <h4>🐍 Exemple Python</h4>
         <div class="api-code">
-import requests<br><br>
-url = "http://localhost:8000/chat"<br>
-data = {"question": "Symptômes cancer sein"}<br><br>
-response = requests.post(url, json=data)<br>
-print(response.json()['answer'])
+import requests<br>
+import urllib.parse<br>
+<br>
+url = "{URL}"<br>
+question = "Symptômes cancer sein"<br>
+params = {<br>
+&nbsp;&nbsp;"question": question,<br>
+&nbsp;&nbsp;"format": "json"<br>
+}<br>
+<br>
+response = requests.get(url, params=params)<br>
+data = response.json()<br>
+print(data['answer'])
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.replace("{URL}", app_url), unsafe_allow_html=True)
     
     st.markdown("""
     <div class="api-info">
         <h4>📋 Exemple JavaScript</h4>
         <div class="api-code">
-fetch('http://localhost:8000/chat', {<br>
-&nbsp;&nbsp;method: 'POST',<br>
-&nbsp;&nbsp;headers: {'Content-Type': 'application/json'},<br>
-&nbsp;&nbsp;body: JSON.stringify({<br>
-&nbsp;&nbsp;&nbsp;&nbsp;question: 'Symptômes cancer sein'<br>
-&nbsp;&nbsp;})<br>
-})<br>
-.then(res => res.json())<br>
-.then(data => console.log(data.answer));
+const url = "{URL}";<br>
+const question = "Symptômes cancer sein";<br>
+<br>
+fetch(`${url}/?question=${encodeURIComponent(question)}&format=json`)<br>
+&nbsp;&nbsp;.then(res => res.json())<br>
+&nbsp;&nbsp;.then(data => console.log(data.answer));
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.replace("{URL}", app_url), unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -713,7 +667,7 @@ if question := st.chat_input("Posez votre question sur le cancer du sein..."):
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v2.3.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
+    <p>ANONTCHIGAN v2.4.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
     <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
