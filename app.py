@@ -7,19 +7,16 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 import streamlit as st
-from streamlit.web import cli as stcli
-import sys
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+import threading
+import time
 
 # ============================================
 # CONFIGURATION
 # ============================================
-
-st.set_page_config(
-    page_title="ANONTCHIGAN API",
-    page_icon="💗",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ANONTCHIGAN")
@@ -32,6 +29,22 @@ class Config:
     MAX_ANSWER_LENGTH = 600
     FAISS_RESULTS_COUNT = 3
     MIN_ANSWER_LENGTH = 30
+
+# ============================================
+# MODÈLES PYDANTIC POUR FASTAPI
+# ============================================
+
+class QuestionRequest(BaseModel):
+    question: str
+    user_id: Optional[str] = None
+    history: Optional[List[Dict[str, str]]] = []
+
+class QuestionResponse(BaseModel):
+    success: bool
+    answer: str
+    method: str
+    similarity_score: Optional[float]
+    user_id: str
 
 # ============================================
 # SERVICE GROQ
@@ -409,63 +422,93 @@ def load_services():
 groq_service, rag_service = load_services()
 
 # ============================================
-# GESTION DES PARAMÈTRES URL - VERSION CORRIGÉE
+# CRÉATION DE L'API FASTAPI
 # ============================================
 
+api = FastAPI(title="ANONTCHIGAN API", version="2.3.0")
 
-# Récupérer les paramètres de l'URL
-try:
-    # Méthode compatible avec Streamlit récent
-    query_params = st.query_params
-    
-    # Vérifier si c'est un appel API
-    if query_params.get("api") == "true":
-        question = query_params.get("question")
+# Configuration CORS - TRÈS PERMISSIVE
+api.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permet toutes les origines
+    allow_credentials=True,
+    allow_methods=["*"],  # Permet toutes les méthodes (GET, POST, etc.)
+    allow_headers=["*"],  # Permet tous les headers
+)
+
+@api.get("/")
+async def root():
+    """Endpoint racine"""
+    return {
+        "message": "ANONTCHIGAN API - Sensibilisation cancer du sein 🇧🇯",
+        "version": "2.3.0",
+        "endpoints": {
+            "POST /chat": "Poser une question",
+            "GET /health": "Vérifier le statut"
+        }
+    }
+
+@api.get("/health")
+async def health():
+    """Vérification de santé de l'API"""
+    return {
+        "status": "healthy",
+        "groq_available": groq_service.available,
+        "questions_count": len(rag_service.questions_data)
+    }
+
+@api.post("/chat", response_model=QuestionResponse)
+async def chat(request: QuestionRequest):
+    """Endpoint principal pour poser des questions"""
+    try:
+        # Générer user_id si non fourni
+        user_id = request.user_id or f"user_{random.randint(1000, 9999)}"
         
-        if question:
-            user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
-            
-            try:
-                result = process_question(question, [], groq_service, rag_service)
-                
-                response_data = {
-                    "success": True,
-                    "answer": result["answer"],
-                    "method": result["method"],
-                    "similarity_score": result["score"],
-                    "user_id": user_id
-                }
-                
-                # Retourner le JSON et arrêter l'exécution
-                st.json(response_data)
-                st.stop()
-                
-            except Exception as e:
-                error_data = {
-                    "success": False,
-                    "error": str(e),
-                    "user_id": user_id
-                }
-                st.json(error_data)
-                st.stop()
-        else:
-            st.json({
-                "success": False,
-                "error": "Paramètre 'question' manquant"
-            })
-            st.stop()
-            
-except Exception as e:
-    # Si erreur avec query_params, continuer normalement
-    logger.warning(f"Erreur query_params: {e}")
-    pass
-
-# SI ON ARRIVE ICI, C'EST QUE CE N'EST PAS UN APPEL API
-# L'interface normale Streamlit s'affiche ci-dessous...
+        # Traiter la question
+        result = process_question(
+            request.question,
+            request.history or [],
+            groq_service,
+            rag_service
+        )
+        
+        return QuestionResponse(
+            success=True,
+            answer=result["answer"],
+            method=result["method"],
+            similarity_score=result["score"],
+            user_id=user_id
+        )
+        
+    except Exception as e:
+        logger.error(f"Erreur API: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================
-# INTERFACE STREAMLIT NORMALE
+# LANCEMENT DE FASTAPI EN ARRIÈRE-PLAN
 # ============================================
+
+def run_fastapi():
+    """Lance FastAPI sur le port 8000"""
+    uvicorn.run(api, host="0.0.0.0", port=8000, log_level="warning")
+
+# Démarrer FastAPI une seule fois
+if "fastapi_started" not in st.session_state:
+    threading.Thread(target=run_fastapi, daemon=True).start()
+    st.session_state.fastapi_started = True
+    time.sleep(2)  # Attendre que FastAPI démarre
+    logger.info("✓ FastAPI lancée sur http://localhost:8000")
+
+# ============================================
+# CONFIGURATION STREAMLIT
+# ============================================
+
+st.set_page_config(
+    page_title="ANONTCHIGAN API",
+    page_icon="💗",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # CSS personnalisé
 st.markdown("""
@@ -535,54 +578,55 @@ with st.sidebar:
     st.markdown("---")
     
     # Documentation API
-    st.markdown("### 🔗 Utiliser l'API")
+    st.markdown("### 🔗 API REST (FastAPI)")
     
-    # Récupérer l'URL de l'app
-    try:
-        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
-    except:
-        app_url = "https://votre-app.streamlit.app"
-    
-    st.markdown(f"""
+    st.markdown("""
     <div class="api-info">
-        <h4>Méthode GET</h4>
-        <p>Envoyez vos questions via URL :</p>
+        <h4>✅ API démarrée sur le port 8000</h4>
+        <p><strong>Base URL locale :</strong> http://localhost:8000</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="api-info">
+        <h4>📝 Exemple cURL</h4>
         <div class="api-code">
-{app_url}/?api=true&question=Votre+question
+curl -X POST http://localhost:8000/chat \\<br>
+&nbsp;&nbsp;-H "Content-Type: application/json" \\<br>
+&nbsp;&nbsp;-d '{"question": "Symptômes cancer sein"}'
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
     <div class="api-info">
-        <h4>📝 Exemple JavaScript</h4>
+        <h4>🐍 Exemple Python</h4>
         <div class="api-code">
-const question = "Symptômes cancer sein";<br>
-const url = `{URL}/?api=true&question=${encodeURIComponent(question)}`;<br>
-<br>
-fetch(url)<br>
-&nbsp;&nbsp;.then(res => res.json())<br>
-&nbsp;&nbsp;.then(data => console.log(data.answer));
+import requests<br><br>
+url = "http://localhost:8000/chat"<br>
+data = {"question": "Symptômes cancer sein"}<br><br>
+response = requests.post(url, json=data)<br>
+print(response.json()['answer'])
         </div>
     </div>
-    """.replace("{URL}", app_url), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     st.markdown("""
     <div class="api-info">
-        <h4>🐍 Exemple Python</h4>
+        <h4>📋 Exemple JavaScript</h4>
         <div class="api-code">
-import requests<br>
-import urllib.parse<br>
-<br>
-question = "Symptômes cancer sein"<br>
-url = f"{URL}/?api=true&question={urllib.parse.quote(question)}"<br>
-<br>
-response = requests.get(url)<br>
-data = response.json()<br>
-print(data['answer'])
+fetch('http://localhost:8000/chat', {<br>
+&nbsp;&nbsp;method: 'POST',<br>
+&nbsp;&nbsp;headers: {'Content-Type': 'application/json'},<br>
+&nbsp;&nbsp;body: JSON.stringify({<br>
+&nbsp;&nbsp;&nbsp;&nbsp;question: 'Symptômes cancer sein'<br>
+&nbsp;&nbsp;})<br>
+})<br>
+.then(res => res.json())<br>
+.then(data => console.log(data.answer));
         </div>
     </div>
-    """.replace("{URL}", app_url), unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     
