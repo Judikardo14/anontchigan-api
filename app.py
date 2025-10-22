@@ -1,5 +1,6 @@
-import json  # noqa: F401
+import json
 import os
+import sys
 import logging
 from typing import Dict, List, Optional
 import random
@@ -11,13 +12,6 @@ import streamlit as st
 # ============================================
 # CONFIGURATION
 # ============================================
-
-st.set_page_config(
-    page_title="ANONTCHIGAN API",
-    page_icon="💗",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ANONTCHIGAN")
@@ -153,7 +147,11 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         return messages
     
     def _clean_response(self, answer: str) -> str:
-        unwanted_intros = ['__?']
+        unwanted_intros = [
+            'bonjour', 'salut', 'coucou', 'hello', 'akwè', 'yo', 'bonsoir', 'hi',
+            'excellente question', 'je suis ravi', 'permettez-moi', 'tout d abord',
+            'premièrement', 'pour commencer', 'en tant qu', 'je suis anontchigan'
+        ]
         
         answer_lower = answer.lower()
         for phrase in unwanted_intros:
@@ -169,7 +167,7 @@ Conseils de prévention : seulement si pertinents et si demandés."""
     
     def _is_valid_answer(self, answer: str) -> bool:
         return (len(answer) >= Config.MIN_ANSWER_LENGTH and 
-                not answer_lower.startswith(('je ne sais pas', 'désolé', 'sorry')))
+                not answer.lower().startswith(('je ne sais pas', 'désolé', 'sorry')))
     
     def _ensure_complete_response(self, answer: str) -> str:
         if not answer:
@@ -254,7 +252,6 @@ class RAGService:
     
     def _initialize_embeddings(self):
         try:
-            # Configuration pour éviter les problèmes de ressources
             os.environ['TOKENIZERS_PARALLELISM'] = 'false'
             os.environ['TRANSFORMERS_CACHE'] = '/tmp/transformers_cache'
             os.environ['SENTENCE_TRANSFORMERS_HOME'] = '/tmp/sentence_transformers'
@@ -304,6 +301,91 @@ class RAGService:
             return []
 
 # ============================================
+# FONCTION DE TRAITEMENT DES QUESTIONS
+# ============================================
+
+def process_question(question: str, history: List[Dict], groq_service, rag_service):
+    """Traite une question et retourne la réponse"""
+    
+    # Salutations
+    salutations = ["cc", "bonjour", "salut", "coucou", "hello", "akwe", "yo", "bonsoir", "hi"]
+    question_lower = question.lower().strip()
+    
+    if any(salut == question_lower for salut in salutations):
+        responses = [
+            "Je suis ANONTCHIGAN, assistante pour la sensibilisation au cancer du sein. Comment puis-je vous aider ? 💗",
+            "Bonjour ! Je suis ANONTCHIGAN. Que souhaitez-vous savoir sur le cancer du sein ? 🌸",
+            "ANONTCHIGAN à votre service. Posez-moi vos questions sur la prévention du cancer du sein. 😊"
+        ]
+        return {
+            "answer": random.choice(responses),
+            "method": "salutation",
+            "score": None
+        }
+    
+    # Recherche FAISS
+    logger.info("🔍 Recherche FAISS...")
+    faiss_results = rag_service.search(question)
+    
+    if not faiss_results:
+        return {
+            "answer": "Les informations disponibles ne couvrent pas ce point spécifique. Je vous recommande de consulter un professionnel de santé au Bénin pour des conseils adaptés. 💗",
+            "method": "no_result",
+            "score": None
+        }
+    
+    best_result = faiss_results[0]
+    similarity = best_result['similarity']
+    
+    logger.info(f"📊 Meilleure similarité: {similarity:.3f}")
+    
+    # Décision : Réponse directe vs Génération
+    if similarity >= Config.SIMILARITY_THRESHOLD:
+        logger.info(f"✅ Haute similarité → Réponse directe")
+        answer = best_result['answer']
+        
+        if len(answer) > Config.MAX_ANSWER_LENGTH:
+            answer = answer[:Config.MAX_ANSWER_LENGTH-3] + "..."
+        
+        return {
+            "answer": answer,
+            "method": "json_direct",
+            "score": float(similarity)
+        }
+    
+    else:
+        logger.info(f"🤖 Similarité modérée → Génération Groq")
+        
+        # Préparer le contexte
+        context_parts = []
+        for i, result in enumerate(faiss_results[:3], 1):
+            answer_truncated = result['answer']
+            if len(answer_truncated) > 200:
+                answer_truncated = answer_truncated[:197] + "..."
+            context_parts.append(f"{i}. Q: {result['question']}\n   R: {answer_truncated}")
+        
+        context = "\n\n".join(context_parts)
+        
+        # Génération avec Groq
+        try:
+            if groq_service.available:
+                answer = groq_service.generate_response(question, context, history)
+                method = "groq_generated"
+            else:
+                answer = "Je vous recommande de consulter un professionnel de santé pour cette question spécifique. La prévention précoce est essentielle. 💗"
+                method = "fallback"
+        except Exception as e:
+            logger.warning(f"Génération échouée: {str(e)}")
+            answer = "Pour des informations précises sur ce sujet, veuillez consulter un médecin ou un centre de santé spécialisé au Bénin. 🌸"
+            method = "error_fallback"
+        
+        return {
+            "answer": answer,
+            "method": method,
+            "score": float(similarity)
+        }
+
+# ============================================
 # INITIALISATION DES SERVICES (CACHE)
 # ============================================
 
@@ -316,226 +398,128 @@ def load_services():
     logger.info("✓ Services chargés")
     return groq, rag
 
+# ============================================
+# DÉTECTION MODE API
+# ============================================
+
+# Désactiver tous les éléments visuels Streamlit
+st.set_page_config(
+    page_title="ANONTCHIGAN API",
+    page_icon="💗",
+    layout="centered"
+)
+
+# Récupérer les paramètres URL
+query_params = st.query_params
+
+# MODE API : Renvoie uniquement du JSON
+if "question" in query_params and query_params.get("format") == "json":
+    # Masquer complètement l'interface Streamlit
+    st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .stApp {background-color: white;}
+        .block-container {padding: 0 !important; max-width: 100% !important;}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    question = query_params.get("question")
+    user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
+    
+    try:
+        # Charger les services
+        groq_service, rag_service = load_services()
+        
+        # Traiter la question
+        result = process_question(question, [], groq_service, rag_service)
+        
+        response_data = {
+            "success": True,
+            "answer": result["answer"],
+            "method": result["method"],
+            "similarity_score": result["score"],
+            "user_id": user_id,
+            "question": question
+        }
+        
+    except Exception as e:
+        response_data = {
+            "success": False,
+            "error": str(e),
+            "user_id": user_id,
+            "question": question
+        }
+    
+    # Afficher UNIQUEMENT le JSON
+    st.code(json.dumps(response_data, ensure_ascii=False, indent=2), language="json")
+    
+    # Bouton pour copier
+    st.download_button(
+        label="📋 Télécharger la réponse JSON",
+        data=json.dumps(response_data, ensure_ascii=False, indent=2),
+        file_name="response.json",
+        mime="application/json"
+    )
+    
+    st.stop()
+
+# ============================================
+# INTERFACE STREAMLIT NORMALE (si pas en mode API)
+# ============================================
+
 groq_service, rag_service = load_services()
 
-# ============================================
-# INTERFACE STREAMLIT
-# ============================================
-
-# CSS personnalisé
 st.markdown("""
-<style>
-    .main-header {
-        text-align: center;
-        padding: 1rem;
-        background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-    }
-    .stat-box {
-        background: #f0f2f6;
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-    }
-    .api-info {
-        background: #e8f4f8;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #0066cc;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Header
-st.markdown("""
-<div class="main-header">
+<div style="text-align: center; padding: 2rem;">
     <h1>💗 ANONTCHIGAN API</h1>
     <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar
-with st.sidebar:
-    st.header("ℹ️ Informations")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{len(rag_service.questions_data)}</h3>
-            <p>Questions</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        groq_status = "✅ Activé" if groq_service.available else "❌ Désactivé"
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{groq_status}</h3>
-            <p>Groq AI</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("""
-    <div class="api-info">
-        <h4>🔗 API REST</h4>
-        <p><strong>Endpoint:</strong> POST /chat</p>
-        <p><strong>Format:</strong></p>
-        <pre>{
-  "question": "...",
-  "user_id": "..."
-}</pre>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("""
-    ### 👥 Créateurs
-    - Judicaël Karol DOBOEVI
-    - Ursus Hornel GBAGUIDI
-    - Abel Kokou KPOCOUTA
-    - Josaphat ADJELE
-    
-    **Club d'IA - ENSGMM Abomey**
-    """)
-    
-    if st.button("🔄 Réinitialiser la conversation"):
-        st.session_state.messages = []
-        st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
-        st.rerun()
+st.info("""
+### 🔗 Utiliser l'API en mode JSON
 
-# Initialisation de la session
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+Pour obtenir une réponse en JSON pur, ajoutez `?format=json&question=VotreQuestion` à l'URL.
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
+**Exemple:**
+```
+https://votre-app.streamlit.app/?format=json&question=Symptômes+cancer+sein
+```
+""")
 
-if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
+# Interface de test
+st.markdown("### 🧪 Tester l'API")
 
-# Afficher l'historique des messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+test_question = st.text_input("Entrez une question pour tester:", placeholder="Ex: Quels sont les symptômes du cancer du sein ?")
 
-# Input utilisateur
-if question := st.chat_input("Posez votre question sur le cancer du sein..."):
-    # Ajouter la question de l'utilisateur
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
-    
-    # Traiter la question
-    with st.chat_message("assistant"):
-        with st.spinner("Je réfléchis..."):
+if st.button("🚀 Tester"):
+    if test_question:
+        with st.spinner("Traitement..."):
             try:
-                # Salutations
-                salutations = ["cc", "bonjour", "salut", "coucou", "hello", "akwe", "yo", "bonsoir", "hi"]
-                question_lower = question.lower().strip()
+                result = process_question(test_question, [], groq_service, rag_service)
                 
-                if any(salut == question_lower for salut in salutations):
-                    responses = [
-                        "Je suis ANONTCHIGAN, assistante pour la sensibilisation au cancer du sein. Comment puis-je vous aider ? 💗",
-                        "Bonjour ! Je suis ANONTCHIGAN. Que souhaitez-vous savoir sur le cancer du sein ? 🌸",
-                        "ANONTCHIGAN à votre service. Posez-moi vos questions sur la prévention du cancer du sein. 😊"
-                    ]
-                    answer = random.choice(responses)
-                    method = "salutation"
-                    score = None
+                response_data = {
+                    "success": True,
+                    "answer": result["answer"],
+                    "method": result["method"],
+                    "similarity_score": result["score"],
+                    "question": test_question
+                }
                 
-                else:
-                    # Recherche FAISS
-                    logger.info("🔍 Recherche FAISS...")
-                    faiss_results = rag_service.search(question)
-                    
-                    if not faiss_results:
-                        answer = "Les informations disponibles ne couvrent pas ce point spécifique. Je vous recommande de consulter un professionnel de santé au Bénin pour des conseils adaptés. 💗"
-                        method = "no_result"
-                        score = None
-                    
-                    else:
-                        best_result = faiss_results[0]
-                        similarity = best_result['similarity']
-                        score = float(similarity)
-                        
-                        logger.info(f"📊 Meilleure similarité: {similarity:.3f}")
-                        
-                        # Décision : Réponse directe vs Génération
-                        if similarity >= Config.SIMILARITY_THRESHOLD:
-                            logger.info(f"✅ Haute similarité → Réponse directe")
-                            answer = best_result['answer']
-                            method = "json_direct"
-                            
-                            if len(answer) > Config.MAX_ANSWER_LENGTH:
-                                answer = answer[:Config.MAX_ANSWER_LENGTH-3] + "..."
-                        
-                        else:
-                            logger.info(f"🤖 Similarité modérée → Génération Groq")
-                            
-                            # Préparer le contexte
-                            context_parts = []
-                            for i, result in enumerate(faiss_results[:3], 1):
-                                answer_truncated = result['answer']
-                                if len(answer_truncated) > 200:
-                                    answer_truncated = answer_truncated[:197] + "..."
-                                context_parts.append(f"{i}. Q: {result['question']}\n   R: {answer_truncated}")
-                            
-                            context = "\n\n".join(context_parts)
-                            
-                            # Génération avec Groq
-                            try:
-                                if groq_service.available:
-                                    answer = groq_service.generate_response(
-                                        question, 
-                                        context, 
-                                        st.session_state.conversation_history
-                                    )
-                                    method = "groq_generated"
-                                else:
-                                    answer = "Je vous recommande de consulter un professionnel de santé pour cette question spécifique. La prévention précoce est essentielle. 💗"
-                                    method = "fallback"
-                            except Exception as e:
-                                logger.warning(f"Génération échouée: {str(e)}")
-                                answer = "Pour des informations précises sur ce sujet, veuillez consulter un médecin ou un centre de santé spécialisé au Bénin. 🌸"
-                                method = "error_fallback"
-                
-                # Afficher la réponse
-                st.markdown(answer)
-                
-                # Afficher les métadonnées (optionnel)
-                with st.expander("ℹ️ Détails de la réponse"):
-                    st.write(f"**Méthode:** {method}")
-                    if score is not None:
-                        st.write(f"**Score de similarité:** {score:.3f}")
-                    st.write(f"**User ID:** {st.session_state.user_id}")
-                
-                # Ajouter à l'historique
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-                
-                # Mettre à jour l'historique de conversation
-                st.session_state.conversation_history.append({"role": "user", "content": question})
-                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
-                
-                # Limiter l'historique
-                if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
-                    st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
+                st.success("✅ Réponse générée !")
+                st.json(response_data)
                 
             except Exception as e:
-                error_message = f"❌ Erreur: {str(e)}"
-                st.error(error_message)
-                logger.error(error_message)
+                st.error(f"❌ Erreur: {str(e)}")
+    else:
+        st.warning("⚠️ Veuillez entrer une question")
 
-# Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v2.2.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
-    <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+    <p>ANONTCHIGAN v3.0.0 - Mode API JSON</p>
+    <p>Développé par le Club d'IA de l'ENSGMM 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
