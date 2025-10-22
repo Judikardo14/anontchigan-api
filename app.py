@@ -27,6 +27,139 @@ class Config:
     MIN_ANSWER_LENGTH = 30
 
 # ============================================
+# CSS PERSONNALISÉ - MASQUER STREAMLIT
+# ============================================
+
+st.markdown("""
+<style>
+    /* MASQUER TOUS LES ÉLÉMENTS STREAMLIT */
+    #MainMenu {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    header {visibility: hidden !important;}
+    .stDeployButton {display: none !important;}
+    div[data-testid="stToolbar"] {display: none !important;}
+    div[data-testid="stDecoration"] {display: none !important;}
+    div[data-testid="stStatusWidget"] {display: none !important;}
+    .stAppHeader {display: none !important;}
+    
+    /* VARIABLES CSS */
+    :root {
+        --rose-primary: #E91E63;
+        --rose-dark: #C2185B;
+        --violet: #9C27B0;
+        --blanc: #FFFFFF;
+        --gris-clair: #F5F5F5;
+    }
+    
+    /* BACKGROUND GLOBAL */
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* CONTENEUR PRINCIPAL */
+    .block-container {
+        padding: 2rem 1rem !important;
+        max-width: 900px !important;
+    }
+    
+    /* MESSAGES UTILISATEUR */
+    .user-message {
+        background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 20px 20px 5px 20px;
+        margin: 1rem 0 1rem auto;
+        max-width: 70%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: slideIn 0.3s ease;
+    }
+    
+    /* MESSAGES BOT */
+    .bot-message {
+        background: white;
+        color: #333;
+        padding: 1rem 1.5rem;
+        border-radius: 20px 20px 20px 5px;
+        margin: 1rem auto 1rem 0;
+        max-width: 70%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* INPUT STYLING */
+    .stTextInput input {
+        border-radius: 25px !important;
+        border: 2px solid var(--rose-primary) !important;
+        padding: 1rem 1.5rem !important;
+        font-size: 1rem !important;
+    }
+    
+    .stTextInput input:focus {
+        border-color: var(--violet) !important;
+        box-shadow: 0 0 0 3px rgba(233,30,99,0.1) !important;
+    }
+    
+    /* BUTTON STYLING */
+    .stButton button {
+        background: linear-gradient(135deg, var(--rose-primary), var(--violet)) !important;
+        color: white !important;
+        border-radius: 25px !important;
+        padding: 0.75rem 2rem !important;
+        border: none !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        transition: all 0.3s !important;
+    }
+    
+    .stButton button:hover {
+        transform: scale(1.05) !important;
+        box-shadow: 0 8px 20px rgba(233,30,99,0.4) !important;
+    }
+    
+    /* BADGES SOURCE */
+    .source-badge {
+        display: inline-block;
+        padding: 0.3rem 0.8rem;
+        border-radius: 15px;
+        font-size: 0.75rem;
+        margin-top: 0.5rem;
+        opacity: 0.8;
+    }
+    
+    .source-badge.json_direct {
+        background: #E8F5E8;
+        color: #2E7D32;
+    }
+    
+    .source-badge.groq_generated {
+        background: #E3F2FD;
+        color: #1565C0;
+    }
+    
+    .source-badge.salutation {
+        background: #F3E5F5;
+        color: #7B1FA2;
+    }
+    
+    .source-badge.no_result {
+        background: #FFF3E0;
+        color: #EF6C00;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================
 # SERVICE GROQ
 # ============================================
 
@@ -400,72 +533,7 @@ def load_services():
     return groq, rag
 
 # ============================================
-# MODE API JSON PUR - UTILISE st.text UNIQUEMENT
-# ============================================
-
-# Charger les services
-groq_service, rag_service = load_services()
-
-# Récupérer les paramètres
-query_params = st.query_params
-
-# SI PARAMÈTRE "api" EXISTE → MODE JSON PUR
-if "api" in query_params and "question" in query_params:
-    
-    # CSS minimal pour masquer Streamlit
-    st.markdown("""
-    <style>
-        #MainMenu, footer, header, .stDeployButton, 
-        div[data-testid="stToolbar"], 
-        div[data-testid="stDecoration"], 
-        div[data-testid="stStatusWidget"] {
-            display: none !important;
-        }
-        .block-container {
-            padding: 1rem !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    question = query_params.get("question")
-    user_id = query_params.get("user_id", f"api_user_{random.randint(1000, 9999)}")
-    
-    try:
-        # Traiter la question
-        result = process_question(question, [], groq_service, rag_service)
-        
-        # Créer la réponse JSON
-        response_data = {
-            "success": True,
-            "data": {
-                "timestamp": datetime.now().isoformat(),
-                "user_id": user_id,
-                "question": question,
-                "answer": result["answer"],
-                "method": result["method"],
-                "similarity_score": result["score"]
-            }
-        }
-        
-    except Exception as e:
-        response_data = {
-            "success": False,
-            "error": str(e),
-            "user_id": user_id,
-            "question": question
-        }
-    
-    # AFFICHER LE JSON EN TEXTE BRUT (FACILEMENT PARSABLE)
-    json_output = json.dumps(response_data, ensure_ascii=False, indent=2)
-    
-    # Utiliser st.text pour un affichage texte pur
-    st.text(json_output)
-    
-    # Arrêter l'exécution
-    st.stop()
-
-# ============================================
-# INTERFACE STREAMLIT NORMALE (si pas en mode API)
+# INTERFACE STREAMLIT
 # ============================================
 
 st.set_page_config(
@@ -474,237 +542,54 @@ st.set_page_config(
     layout="centered"
 )
 
-# Initialisation historique
-if "conversation_log" not in st.session_state:
-    st.session_state.conversation_log = []
+# Charger les services
+groq_service, rag_service = load_services()
 
+# Initialisation de l'historique de conversation
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Header personnalisé
 st.markdown("""
-<div style="text-align: center; padding: 2rem;">
-    <h1>💗 ANONTCHIGAN</h1>
-    <p>Assistante IA - Cancer du sein au Bénin 🇧🇯</p>
+<div style="text-align: center; padding: 2rem 1rem; background: white; border-radius: 20px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <h1 style="color: #E91E63; margin: 0;">💗 ANONTCHIGAN</h1>
+    <p style="color: #666; margin: 0.5rem 0 0 0;">Assistante IA - Cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["💬 Chatbot", "📊 Historique", "🔗 API GET"])
-
-with tab1:
-    st.markdown("### Posez votre question")
-    question = st.text_input("Votre question:", placeholder="Ex: Quels sont les symptômes ?")
-    
-    if st.button("🚀 Envoyer", type="primary"):
-        if question:
-            with st.spinner("Traitement..."):
-                try:
-                    result = process_question(question, [], groq_service, rag_service)
-                    
-                    entry = {
-                        "timestamp": datetime.now().isoformat(),
-                        "user_id": "web_user",
-                        "question": question,
-                        "answer": result["answer"],
-                        "method": result["method"],
-                        "similarity_score": result["score"]
-                    }
-                    st.session_state.conversation_log.append(entry)
-                    
-                    st.success("✅ Réponse générée !")
-                    st.markdown(f"**Réponse:** {result['answer']}")
-                    st.info(f"Méthode: {result['method']} | Score: {result['score']}")
-                    
-                except Exception as e:
-                    st.error(f"❌ Erreur: {str(e)}")
-
-with tab2:
-    st.markdown("### 📊 Historique des conversations")
-    
-    if st.session_state.conversation_log:
-        st.write(f"**Total:** {len(st.session_state.conversation_log)} conversations")
-        
-        json_data = json.dumps(st.session_state.conversation_log, ensure_ascii=False, indent=2)
-        st.download_button(
-            label="📥 Télécharger l'historique (JSON)",
-            data=json_data,
-            file_name=f"anontchigan_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-            mime="application/json"
-        )
-        
-        for i, entry in enumerate(reversed(st.session_state.conversation_log[-10:]), 1):
-            with st.expander(f"#{i} - {entry['timestamp'][:19]}"):
-                st.markdown(f"**Question:** {entry['question']}")
-                st.markdown(f"**Réponse:** {entry['answer']}")
-                st.caption(f"Méthode: {entry['method']} | Score: {entry['similarity_score']}")
-        
-        if st.button("🗑️ Effacer l'historique"):
-            st.session_state.conversation_log = []
-            st.rerun()
+# Afficher l'historique des messages
+for message in st.session_state.messages:
+    if message["role"] == "user":
+        st.markdown(f'<div class="user-message">{message["content"]}</div>', unsafe_allow_html=True)
     else:
-        st.info("Aucune conversation.")
+        method_badge = f'<span class="source-badge {message.get("method", "")}">{message.get("method", "bot")}</span>'
+        st.markdown(f'<div class="bot-message">{message["content"]}<br>{method_badge}</div>', unsafe_allow_html=True)
 
-with tab3:
-    st.markdown("### 🔗 API GET - JSON Direct")
-    
-    st.success("✅ **MODE TEXTE PUR - JSON directement parsable sans HTML !**")
-    
-    current_url = "https://votre-app.streamlit.app"
-    
-    st.markdown(f"""
-    ### 📍 Format de l'URL
-    
-    ```
-    {current_url}/?api=true&question=VotreQuestion&user_id=user123
-    ```
-    
-    ### 🎯 Extraction ULTRA SIMPLE
-    
-    **1. Python (requests) - Version SIMPLE:**
-    ```python
-    import requests
-    import json
-    
-    def get_anontchigan(question, user_id="user123"):
-        url = "{current_url}"
-        params = {{"api": "true", "question": question, "user_id": user_id}}
-        
-        response = requests.get(url, params=params)
-        
-        # Le contenu est du JSON pur dans le texte brut
-        # Extraire uniquement les lignes JSON (ignorer le HTML)
-        lines = response.text.split('\\n')
-        json_lines = [line for line in lines if line.strip().startswith('{{')]
-        
-        if json_lines:
-            json_text = '\\n'.join(json_lines)
-            return json.loads(json_text)
-        
-        return None
-    
-    # Utilisation
-    result = get_anontchigan("Symptômes du cancer du sein")
-    if result and result['success']:
-        print(result['data']['answer'])
-    ```
-    
-    **2. Python - Version REGEX (plus robuste):**
-    ```python
-    import requests
-    import json
-    import re
-    
-    def get_anontchigan(question, user_id="user123"):
-        url = "{current_url}"
-        params = {{"api": "true", "question": question, "user_id": user_id}}
-        
-        response = requests.get(url, params=params)
-        
-        # Chercher le bloc JSON complet
-        match = re.search(r'(\\{{[\\s\\S]*?"success":[\\s\\S]*?\\}})', response.text)
-        
-        if match:
-            return json.loads(match.group(1))
-        
-        return None
-    
-    # Utilisation
-    result = get_anontchigan("Quels sont les symptômes ?")
-    print(result['data']['answer'])
-    ```
-    
-    **3. JavaScript (fetch):**
-    ```javascript
-    async function getAnontchigan(question, userId = 'user123') {{
-        const url = `{current_url}/?api=true&question=${{encodeURIComponent(question)}}&user_id=${{userId}}`;
-        
-        const response = await fetch(url);
-        const text = await response.text();
-        
-        // Extraire le JSON du texte
-        const match = text.match(/(\\{{[\\s\\S]*?"success":[\\s\\S]*?\\}})/);
-        
-        if (match) {{
-            return JSON.parse(match[1]);
-        }}
-        
-        return null;
-    }}
-    
-    // Utilisation
-    const result = await getAnontchigan("Symptômes cancer sein");
-    if (result && result.success) {{
-        console.log(result.data.answer);
-    }}
-    ```
-    
-    **4. cURL + jq:**
-    ```bash
-    curl -s "{current_url}/?api=true&question=Symptômes&user_id=test" | \\
-        grep -E '^\\{{' | \\
-        jq '.data.answer'
-    ```
-    
-    **5. PHP:**
-    ```php
-    function getAnontchigan($question, $userId = 'user123') {{
-        $url = '{current_url}/?api=true&question=' . urlencode($question) . '&user_id=' . $userId;
-        $response = file_get_contents($url);
-        
-        // Extraire le JSON
-        preg_match('/(\\{{[\\s\\S]*?"success":[\\s\\S]*?\\}})/', $response, $matches);
-        
-        if ($matches) {{
-            return json_decode($matches[1], true);
-        }}
-        
-        return null;
-    }}
-    
-    // Utilisation
-    $result = getAnontchigan('Symptômes');
-    if ($result && $result['success']) {{
-        echo $result['data']['answer'];
-    }}
-    ```
-    
-    ### 🔥 Avantages
-    
-    - ✅ **JSON visible en texte brut** dans la réponse
-    - ✅ **Extraction simple** avec regex basique
-    - ✅ **Pas de parsing HTML complexe**
-    - ✅ **Compatible tous langages**
-    - ✅ **CORS ouvert**
-    """)
-    
-    st.markdown("---")
-    st.markdown("### 🧪 Tester l'API")
-    
-    test_question = st.text_input("Question de test:", key="api_test")
-    
-    if st.button("Tester l'API GET"):
-        if test_question:
-            api_url = f"{current_url}/?api=true&question={test_question}&user_id=test"
-            st.code(api_url, language="text")
-            
-            # Afficher ce que vous allez recevoir
-            st.markdown("**Réponse JSON attendue (dans le texte brut):**")
-            result = process_question(test_question, [], groq_service, rag_service)
-            response_example = {
-                "success": True,
-                "data": {
-                    "timestamp": datetime.now().isoformat(),
-                    "user_id": "test",
-                    "question": test_question,
-                    "answer": result["answer"],
-                    "method": result["method"],
-                    "similarity_score": result["score"]
-                }
-            }
-            st.json(response_example)
-            
-            st.info("💡 Le JSON sera visible en texte brut, cherchez simplement le bloc `{\"success\": true...}`")
+# Zone de saisie
+user_input = st.text_input("Votre question :", placeholder="Ex: Quels sont les symptômes du cancer du sein ?", key="user_input")
 
-st.markdown("---")
+if st.button("💬 Envoyer", use_container_width=True):
+    if user_input:
+        # Ajouter le message utilisateur
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        # Traiter la question
+        with st.spinner("🤔 Réflexion en cours..."):
+            result = process_question(user_input, [], groq_service, rag_service)
+            
+            # Ajouter la réponse du bot
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": result["answer"],
+                "method": result["method"]
+            })
+        
+        # Recharger la page pour afficher les nouveaux messages
+        st.rerun()
+
+# Footer
 st.markdown("""
-<div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v6.0.0 - JSON Direct Mode</p>
-    <p>Développé par le Club d'IA de l'ENSGMM 🇧🇯</p>
+<div style="text-align: center; color: white; margin-top: 2rem; opacity: 0.8;">
+    <p style="font-size: 0.9rem;">ANONTCHIGAN - Développé par le Club d'IA de l'ENSGMM 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
