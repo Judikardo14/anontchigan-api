@@ -1,318 +1,133 @@
+import streamlit as st
 import json
-import os
-import sys
 import logging
 from typing import Dict, List, Optional
 import random
+from difflib import SequenceMatcher
 import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
-import streamlit as st
-from datetime import datetime
-import time
+import uuid
 
 # ============================================
-# CONFIGURATION
+# CONFIGURATION DE LA PAGE STREAMLIT
 # ============================================
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ANONTCHIGAN")
-
-class Config:
-    """Configuration optimisée"""
-    SIMILARITY_THRESHOLD = 0.75
-    MAX_HISTORY_LENGTH = 8
-    MAX_CONTEXT_LENGTH = 1000
-    MAX_ANSWER_LENGTH = 600
-    FAISS_RESULTS_COUNT = 3
-    MIN_ANSWER_LENGTH = 30
+st.set_page_config(
+    page_title="ANONTCHIGAN - Prévention Cancer du Sein",
+    page_icon="🎀",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 # ============================================
-# CSS PERSONNALISÉ - INTERFACE MODERNE
+# CSS PERSONNALISÉ - DESIGN OCTOBRE ROSE
 # ============================================
 
 st.markdown("""
 <style>
-    /* MASQUER ABSOLUMENT TOUS LES ÉLÉMENTS STREAMLIT */
-    #MainMenu {visibility: hidden !important; display: none !important;}
-    footer {visibility: hidden !important; display: none !important;}
-    header {visibility: hidden !important; display: none !important;}
-    .stDeployButton {display: none !important;}
-    div[data-testid="stToolbar"] {display: none !important;}
-    div[data-testid="stDecoration"] {display: none !important;}
-    div[data-testid="stStatusWidget"] {display: none !important;}
-    .stAppHeader {display: none !important;}
-    button[title="View fullscreen"] {display: none !important;}
-    button[title="Manage app"] {display: none !important;}
-    div[data-testid="stToolbar"] > div {display: none !important;}
-    div[data-testid="manage-app-button"] {display: none !important;}
-    section[data-testid="stSidebar"] {display: none !important;}
-    div.styles_viewerBadge__1yB5_ {display: none !important;}
-    .viewerBadge_container__1QSob {display: none !important;}
-    .viewerBadge_link__1S137 {display: none !important;}
-    .viewerBadge_text__1JaDK {display: none !important;}
-    
-    /* VARIABLES CSS - OCTOBRE ROSE */
+    /* Variables CSS */
     :root {
         --rose-primary: #E91E63;
-        --rose-clair: #FCE4EC;
-        --rose-fonce: #C2185B;
+        --rose-light: #FCE4EC;
+        --rose-dark: #C2185B;
+        --violet: #9C27B0;
         --blanc: #FFFFFF;
-        --gris-clair: #F8F9FA;
-        --beige-clair: #FFF3E0;
-        --ombre-douce: 0 2px 12px rgba(233, 30, 99, 0.15);
+        --gris-clair: #F5F5F5;
+        --gris-fonce: #424242;
     }
     
-    /* BACKGROUND GLOBAL - BLANC PUR */
+    /* Reset Streamlit */
     .stApp {
-        background: #FFFFFF !important;
+        background: linear-gradient(135deg, #FCE4EC 0%, #E1BEE7 100%);
     }
     
-    /* CONTENEUR PRINCIPAL */
-    .block-container {
-        padding: 0 !important;
-        max-width: 100% !important;
-        background: white !important;
-    }
-    
-    /* NAVBAR SUPÉRIEURE - ROSE OCTOBRE */
-    .top-navbar {
-        background: linear-gradient(135deg, #E91E63 0%, #D81B60 100%);
-        padding: 1rem 2rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 4px 15px rgba(233, 30, 99, 0.25);
-    }
-    
-    .navbar-logo {
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-        color: white;
-        font-weight: 800;
-        font-size: 1.4rem;
-        letter-spacing: 0.5px;
-    }
-    
-    .navbar-menu {
-        display: flex;
-        gap: 2rem;
-    }
-    
-    .navbar-menu a {
-        color: white;
-        text-decoration: none;
-        font-size: 1rem;
-        font-weight: 600;
-        padding: 0.5rem 1.2rem;
-        border-radius: 25px;
-        transition: all 0.3s ease;
-    }
-    
-    .navbar-menu a:hover {
-        background: rgba(255,255,255,0.25);
-        transform: translateY(-2px);
-    }
-    
-    .navbar-menu a.active {
-        background: rgba(255,255,255,0.3);
-    }
-    
-    /* HEADER AVEC AVATAR - DESIGN ÉLÉGANT */
-    .bot-header-card {
-        background: linear-gradient(135deg, #E91E63 0%, #F06292 100%);
-        padding: 2rem 2.5rem;
-        margin: 0;
-        border-radius: 0 0 40px 40px;
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-        box-shadow: 0 6px 25px rgba(233, 30, 99, 0.3);
+    /* Header personnalisé */
+    .main-header {
+        background: linear-gradient(135deg, #E91E63 0%, #9C27B0 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
         position: relative;
         overflow: hidden;
     }
     
-    .bot-header-card::before {
+    .main-header::before {
         content: '';
         position: absolute;
         top: -50%;
         right: -10%;
-        width: 400px;
-        height: 400px;
+        width: 300px;
+        height: 300px;
         background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
         border-radius: 50%;
+        animation: float 6s ease-in-out infinite;
     }
     
-    .bot-avatar-circle {
-        width: 65px;
-        height: 65px;
-        background: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(5deg); }
+    }
+    
+    .main-header h1 {
+        color: white;
         font-size: 2.5rem;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-        position: relative;
-        z-index: 2;
-    }
-    
-    .bot-header-text {
-        position: relative;
-        z-index: 2;
-    }
-    
-    .bot-header-text h2 {
         margin: 0;
-        color: white;
-        font-size: 1.6rem;
-        font-weight: 800;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .bot-header-text p {
-        margin: 0.3rem 0 0 0;
-        color: rgba(255,255,255,0.95);
-        font-size: 1rem;
-        font-weight: 500;
-    }
-    
-    /* BANNIÈRE BIENVENUE - DESIGN PREMIUM */
-    .welcome-banner {
-        background: linear-gradient(135deg, #FCE4EC 0%, #F8BBD0 100%);
-        margin: 2rem 2.5rem 1.5rem 2.5rem;
-        padding: 3rem 2rem;
-        border-radius: 30px;
-        text-align: center;
-        box-shadow: 0 8px 30px rgba(233, 30, 99, 0.15);
-        border: 2px solid rgba(233, 30, 99, 0.1);
-    }
-    
-    .welcome-banner .ribbon-icon {
-        font-size: 4rem;
-        margin-bottom: 1rem;
-        filter: drop-shadow(0 4px 8px rgba(233, 30, 99, 0.3));
-    }
-    
-    .welcome-banner h3 {
-        color: #C2185B;
-        font-size: 1.8rem;
-        margin: 1rem 0;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-    }
-    
-    .welcome-banner p {
-        color: #880E4F;
-        font-size: 1.1rem;
-        margin: 0.5rem 0 0 0;
-        line-height: 1.6;
-    }
-    
-    /* ZONE DE CHAT - FOND BLANC */
-    .chat-container {
-        padding: 1.5rem 2.5rem;
-        max-height: calc(100vh - 450px);
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        background: white;
-    }
-    
-    /* MESSAGE BOT AVEC AVATAR - DESIGN SOIGNÉ */
-    .bot-message-wrapper {
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        animation: slideInLeft 0.4s ease-out;
-    }
-    
-    .bot-mini-avatar {
-        width: 42px;
-        height: 42px;
-        background: linear-gradient(135deg, #E91E63, #F06292);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-        flex-shrink: 0;
-        box-shadow: 0 3px 10px rgba(233, 30, 99, 0.3);
-    }
-    
-    .bot-message-content {
-        background: #FFFFFF;
-        color: #333;
-        padding: 1.2rem 1.5rem;
-        border-radius: 20px 20px 20px 5px;
-        max-width: 75%;
-        box-shadow: 0 3px 15px rgba(0, 0, 0, 0.08);
-        word-wrap: break-word;
-        line-height: 1.7;
-        border: 1px solid rgba(233, 30, 99, 0.1);
-    }
-    
-    .bot-message-content ul {
-        margin: 0.8rem 0;
-        padding-left: 1.8rem;
-    }
-    
-    .bot-message-content li {
-        margin: 0.5rem 0;
-        color: #444;
-    }
-    
-    /* ENCADRÉ D'AVERTISSEMENT - ROSE */
-    .info-box {
-        background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
-        border-left: 5px solid #E91E63;
-        padding: 1rem 1.2rem;
-        margin: 1rem 0;
-        border-radius: 12px;
-        display: flex;
-        align-items: flex-start;
-        gap: 0.8rem;
-        box-shadow: 0 2px 8px rgba(233, 30, 99, 0.1);
-    }
-    
-    .info-box-icon {
-        font-size: 1.4rem;
-        flex-shrink: 0;
-    }
-    
-    .info-box-text {
-        font-size: 0.95rem;
-        color: #5D4037;
-        line-height: 1.6;
-    }
-    
-    .info-box-text strong {
-        color: #E91E63;
         font-weight: 700;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     }
     
-    /* MESSAGES UTILISATEUR - ROSE ÉLÉGANT */
-    .user-message {
-        background: linear-gradient(135deg, #E91E63 0%, #F06292 100%);
+    .main-header p {
         color: white;
-        padding: 1.2rem 1.5rem;
-        border-radius: 20px 20px 5px 20px;
+        font-size: 1.2rem;
+        margin-top: 0.5rem;
+        opacity: 0.95;
+    }
+    
+    /* Container du chat */
+    .chat-container {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        max-width: 1200px;
         margin-left: auto;
-        max-width: 75%;
-        box-shadow: 0 4px 15px rgba(233, 30, 99, 0.3);
-        animation: slideInRight 0.4s ease-out;
-        word-wrap: break-word;
-        margin-bottom: 1.5rem;
-        font-weight: 500;
+        margin-right: auto;
+    }
+    
+    /* Messages du chat */
+    .user-message {
+        background: linear-gradient(135deg, #E91E63 0%, #9C27B0 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 20px 20px 5px 20px;
+        margin: 1rem 0;
+        max-width: 80%;
+        margin-left: auto;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        animation: slideInRight 0.3s ease-out;
+    }
+    
+    .bot-message {
+        background: #F5F5F5;
+        color: #424242;
+        padding: 1rem 1.5rem;
+        border-radius: 20px 20px 20px 5px;
+        margin: 1rem 0;
+        max-width: 80%;
+        margin-right: auto;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #E91E63;
+        animation: slideInLeft 0.3s ease-out;
     }
     
     @keyframes slideInRight {
         from {
             opacity: 0;
-            transform: translateX(40px);
+            transform: translateX(30px);
         }
         to {
             opacity: 1;
@@ -323,7 +138,7 @@ st.markdown("""
     @keyframes slideInLeft {
         from {
             opacity: 0;
-            transform: translateX(-40px);
+            transform: translateX(-30px);
         }
         to {
             opacity: 1;
@@ -331,214 +146,159 @@ st.markdown("""
         }
     }
     
-    /* TYPING INDICATOR - ROSE */
-    .typing-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-    
-    .typing-indicator {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+    /* Input personnalisé */
+    .stTextInput > div > div > input {
+        border-radius: 25px;
+        border: 2px solid #E91E63;
         padding: 1rem 1.5rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #9C27B0;
+        box-shadow: 0 0 0 3px rgba(233, 30, 99, 0.1);
+    }
+    
+    /* Bouton personnalisé */
+    .stButton > button {
+        background: linear-gradient(135deg, #E91E63 0%, #9C27B0 100%);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        padding: 0.75rem 2rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        width: 100%;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
+    /* Cards des statistiques */
+    .stat-card {
         background: white;
-        border-radius: 20px;
-        box-shadow: 0 3px 15px rgba(233, 30, 99, 0.15);
-        border: 1px solid rgba(233, 30, 99, 0.1);
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-top: 4px solid #E91E63;
+        text-align: center;
+        transition: all 0.3s ease;
     }
     
-    .typing-dot {
-        width: 10px;
-        height: 10px;
-        background: #E91E63;
-        border-radius: 50%;
-        animation: typing 1.4s infinite ease-in-out;
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
     }
     
-    .typing-dot:nth-child(2) {
-        animation-delay: 0.2s;
-    }
-    
-    .typing-dot:nth-child(3) {
-        animation-delay: 0.4s;
-    }
-    
-    @keyframes typing {
-        0%, 60%, 100% {
-            transform: translateY(0);
-            opacity: 0.4;
-        }
-        30% {
-            transform: translateY(-12px);
-            opacity: 1;
-        }
-    }
-    
-    /* QUESTIONS RAPIDES - DESIGN MODERNE */
-    .quick-questions-section {
-        padding: 0 2.5rem 1.5rem 2.5rem;
-        background: white;
-    }
-    
-    .quick-questions-title {
+    .stat-card h3 {
         color: #E91E63;
-        font-size: 1.1rem;
+        font-size: 2rem;
+        margin: 0;
         font-weight: 700;
-        margin-bottom: 1rem;
+    }
+    
+    .stat-card p {
+        color: #424242;
+        margin-top: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    /* Info boxes */
+    .info-box {
+        background: linear-gradient(135deg, #FCE4EC 0%, #F3E5F5 100%);
+        border-left: 4px solid #E91E63;
+        padding: 1.5rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .info-box h4 {
+        color: #C2185B;
+        margin-top: 0;
+        font-size: 1.2rem;
+    }
+    
+    /* Footer */
+    .custom-footer {
+        background: linear-gradient(135deg, #424242 0%, #616161 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-top: 3rem;
         text-align: center;
     }
     
-    /* BOUTONS QUESTIONS - STYLE PILULES */
-    .stButton button {
-        background: white !important;
-        color: #E91E63 !important;
-        border: 2px solid #E91E63 !important;
-        border-radius: 25px !important;
-        padding: 0.9rem 1.5rem !important;
-        font-weight: 600 !important;
-        font-size: 0.95rem !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 3px 10px rgba(233, 30, 99, 0.15) !important;
-        width: 100% !important;
-        text-align: center !important;
+    .custom-footer a {
+        color: #FCE4EC;
+        text-decoration: none;
+        transition: color 0.3s;
     }
     
-    .stButton button:hover {
-        background: linear-gradient(135deg, #E91E63, #F06292) !important;
-        color: white !important;
-        transform: translateY(-3px) !important;
-        box-shadow: 0 6px 20px rgba(233, 30, 99, 0.3) !important;
-        border-color: #F06292 !important;
+    .custom-footer a:hover {
+        color: #E91E63;
     }
     
-    /* INPUT ZONE FIXE EN BAS - ÉLÉGANTE */
-    .input-fixed-bottom {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        padding: 1.2rem 2.5rem;
-        box-shadow: 0 -4px 20px rgba(233, 30, 99, 0.1);
-        z-index: 1000;
-        border-top: 2px solid rgba(233, 30, 99, 0.1);
-    }
-    
-    .input-wrapper {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        max-width: 900px;
-        margin: 0 auto;
-    }
-    
-    .stTextInput input {
-        border-radius: 30px !important;
-        border: 2px solid #E91E63 !important;
-        padding: 1.1rem 1.8rem !important;
-        font-size: 1rem !important;
-        width: 100% !important;
-        background: white !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stTextInput input:focus {
-        border-color: #F06292 !important;
-        box-shadow: 0 0 0 4px rgba(233, 30, 99, 0.1) !important;
-        outline: none !important;
-    }
-    
-    .stTextInput input::placeholder {
-        color: #999 !important;
-        font-style: italic;
-    }
-    
-    /* BOUTON D'ENVOI - CIRCULAIRE ROSE */
-    div[data-testid="column"]:last-child .stButton button {
-        background: linear-gradient(135deg, #E91E63, #F06292) !important;
-        color: white !important;
-        border-radius: 50% !important;
-        width: 55px !important;
-        height: 55px !important;
-        min-width: 55px !important;
-        border: none !important;
-        font-size: 1.5rem !important;
-        padding: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(233, 30, 99, 0.4) !important;
-    }
-    
-    div[data-testid="column"]:last-child .stButton button:hover {
-        transform: scale(1.1) rotate(15deg) !important;
-        box-shadow: 0 6px 25px rgba(233, 30, 99, 0.5) !important;
-    }
-    
-    /* SCROLLBAR PERSONNALISÉE - ROSE */
-    .chat-container::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    .chat-container::-webkit-scrollbar-track {
-        background: rgba(233, 30, 99, 0.05);
-        border-radius: 10px;
-    }
-    
-    .chat-container::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #E91E63, #F06292);
-        border-radius: 10px;
-    }
-    
-    .chat-container::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, #C2185B, #E91E63);
-    }
-    
-    /* RESPONSIVE - MOBILE */
+    /* Responsive */
     @media (max-width: 768px) {
-        .navbar-menu {
-            display: none;
+        .main-header h1 {
+            font-size: 1.8rem;
         }
         
-        .bot-message-content,
-        .user-message {
-            max-width: 85%;
+        .main-header p {
+            font-size: 1rem;
+        }
+        
+        .user-message, .bot-message {
+            max-width: 95%;
         }
         
         .chat-container {
-            max-height: calc(100vh - 480px);
-            padding: 1rem 1.5rem;
-        }
-        
-        .welcome-banner {
-            padding: 2rem 1.5rem;
-            margin: 1.5rem 1.5rem 1rem 1.5rem;
-        }
-        
-        .input-fixed-bottom {
-            padding: 1rem 1.5rem;
-        }
-        
-        .bot-header-card {
-            padding: 1.5rem 1.5rem;
-        }
-        
-        .navbar-logo {
-            font-size: 1.2rem;
+            padding: 1rem;
         }
     }
+    
+    /* Cacher les éléments Streamlit par défaut */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    .stDeployButton {display:none;}
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================
-# SERVICE GROQ (NON MODIFIÉ)
+# CONFIGURATION ET LOGGING (CODE ORIGINAL)
+# ============================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("ANONTCHIGAN")
+
+class Config:
+    """Configuration optimisée pour éviter les coupures"""
+    SIMILARITY_THRESHOLD = 0.75
+    MAX_HISTORY_LENGTH = 8
+    MAX_CONTEXT_LENGTH = 1000
+    MAX_ANSWER_LENGTH = 600
+    FAISS_RESULTS_COUNT = 3
+    MIN_ANSWER_LENGTH = 30
+
+# ============================================
+# SERVICE GROQ (CODE ORIGINAL)
 # ============================================
 
 class GroqService:
+    
     def __init__(self):
         self.client = None
         self.available = False
@@ -548,7 +308,7 @@ class GroqService:
         try:
             from groq import Groq
             
-            api_key = os.getenv("GROQ_API_KEY", "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")
+            api_key = "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"
             if not api_key:
                 logger.warning("Clé API Groq manquante")
                 return
@@ -573,11 +333,15 @@ class GroqService:
             raise RuntimeError("Service Groq non disponible")
         
         try:
+            # Préparer le contexte optimisé
             context_short = self._prepare_context(context)
+            
+            # Préparer les messages
             messages = self._prepare_messages(question, context_short, history)
             
             logger.info("🤖 Génération avec Groq...")
             
+            # AUGMENTER SIGNIFICATIVEMENT les tokens pour éviter les coupures
             response = self.client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=messages,
@@ -589,9 +353,11 @@ class GroqService:
             answer = response.choices[0].message.content.strip()
             answer = self._clean_response(answer)
             
+            # Validation renforcée
             if not self._is_valid_answer(answer):
                 raise ValueError("Réponse trop courte")
                 
+            # Vérification et correction des coupures
             answer = self._ensure_complete_response(answer)
             
             logger.info(f"✓ Réponse générée ({len(answer)} caractères)")
@@ -602,6 +368,7 @@ class GroqService:
             raise
     
     def _prepare_context(self, context: str) -> str:
+        """Prépare un contexte concis"""
         lines = context.split('\n')[:5]
         context_short = '\n'.join(lines)
         if len(context_short) > Config.MAX_CONTEXT_LENGTH:
@@ -609,6 +376,8 @@ class GroqService:
         return context_short
     
     def _prepare_messages(self, question: str, context: str, history: List[Dict]) -> List[Dict]:
+        """Prépare les messages avec instructions claires contre les coupures"""
+        
         system_prompt = f"""Tu es ANONTCHIGAN, assistante IA professionnelle spécialisée dans la sensibilisation au cancer du sein au Bénin.
 
 CONTEXTE À UTILISER :
@@ -618,7 +387,8 @@ RÈGLES CRITIQUES :
 1. FOURNIR DES RÉPONSES COMPLÈTES - ne JAMAIS couper une phrase en milieu de mot
 2. Si tu donnes un conseil de prévention, aller deux fois à la ligne AVANT de le donner
 3. Tes réponses doivent se terminer naturellement par un point final
-4. Tes créateurs sont Judicaël Karol DOBOEVI, Ursus Hornel GBAGUIDI, Abel Kokou KPOCOUTA et Josaphat ADJELE, tous membres du club d'IA de l'ENSGMM (Ecole Nationale Supérieure de Génie Mathématique et Modélisation) d'Abomey.
+4. Tes créateurs sont Judicaël Karol DOBOEVI, Ursus Hornel GBAGUIDI, Abel Kokou KPOCOUTA et Josaphat ADJELE, touts membres
+du club d'IA de l'ENSGMM (Ecole Nationale Supérieure de Génie Mathématique et Modélisation) d'Abomey. 
 
 STYLE :
 - Professionnel, clair, empathique
@@ -629,15 +399,15 @@ STYLE :
 
 STRUCTURE DES RÉPONSES :
 1. Réponse principale basée sur le contexte
-2. N'invente PAS d'informations
-3. Si le contexte ne couvre pas la question, recommande de consulter un professionnel de santé au Bénin
-4. ENSGMM se définit comme l'Ecole Nationale Supérieure de Génie Mathématique et Modélisation
-5. Utilise des connecteurs logiques pour fluidifier et produire des réponses naturelles et cohérentes
+2- N'invente PAS d'informations
+3- Si le contexte ne couvre pas la question, recommande de consulter un professionnel de santé au Bénin
+4- ENSGMM se définit comme l'Ecole Nationale Supérieure de Génie Mathématique et Modélisation 
+5- Utilise des connecteurs logiques pour fluidifier et produire des réponses naturelles et cohérentes
 
-DIRECTIVES ANTI-COUPURE :
+DIRECTIVES ANTI-CONPUTURE :
 - Vérifie que ta réponse est complète avant de terminer
 - Ne coupe PAS en milieu de phrase ou de mot
-- Utilise "Atassa!" ou "Atassaaaaa!" en début de phrase en cas d'humour et d'étonnement extrême
+- Utilise "Atassa!" ou "Atassaaaaa!" en debut de phrase en cas dh'humour et d'étonnemnt extrême
 - Termine par un point final approprié
 - Si tu mentionnes des noms (créateurs, etc.), assure-toi qu'ils sont COMPLETS
 
@@ -645,9 +415,11 @@ Conseils de prévention : seulement si pertinents et si demandés."""
 
         messages = [{"role": "system", "content": system_prompt}]
         
+        # Historique récent
         for msg in history[-4:]:
             messages.append(msg)
         
+        # Question actuelle avec instruction explicite
         messages.append({
             "role": "user", 
             "content": f"QUESTION: {question}\n\nIMPORTANT : Réponds de façon COMPLÈTE sans couper ta réponse. Termine par un point final. Si conseil de prévention, va à la ligne avant."
@@ -656,6 +428,9 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         return messages
     
     def _clean_response(self, answer: str) -> str:
+        """Nettoie la réponse en gardant la personnalité"""
+        
+        # Supprimer les introductions verbeuses
         unwanted_intros = [
             'bonjour', 'salut', 'coucou', 'hello', 'akwè', 'yo', 'bonsoir', 'hi',
             'excellente question', 'je suis ravi', 'permettez-moi', 'tout d abord',
@@ -675,13 +450,16 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         return answer.strip()
     
     def _is_valid_answer(self, answer: str) -> bool:
+        """Valide que la réponse est acceptable"""
         return (len(answer) >= Config.MIN_ANSWER_LENGTH and 
                 not answer.lower().startswith(('je ne sais pas', 'désolé', 'sorry')))
     
     def _ensure_complete_response(self, answer: str) -> str:
+        """Garantit que la réponse est complète et non coupée"""
         if not answer:
             return answer
             
+        # Détecter les signes de coupure
         cut_indicators = [
             answer.endswith('...'),
             answer.endswith(','),
@@ -694,6 +472,7 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         if any(cut_indicators):
             logger.warning("⚠️  Détection possible de réponse coupée")
             
+            # Trouver la dernière phrase complète
             last_period = answer.rfind('.')
             last_exclamation = answer.rfind('!')
             last_question = answer.rfind('?')
@@ -707,6 +486,7 @@ Conseils de prévention : seulement si pertinents et si demandés."""
                 if not answer.endswith(('.', '!', '?')):
                     answer += '.'
         
+        # Formater les conseils de prévention avec saut de ligne
         prevention_phrases = [
             'conseil de prévention',
             'pour prévenir',
@@ -729,10 +509,12 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         return answer
 
 # ============================================
-# SERVICE RAG
+# SERVICES RAG (CODE ORIGINAL)
 # ============================================
 
 class RAGService:
+    """Service RAG avec recherche améliorée"""
+    
     def __init__(self, data_file: str = 'cancer_sein.json'):
         self.questions_data = []
         self.embedding_model = None
@@ -761,10 +543,6 @@ class RAGService:
     
     def _initialize_embeddings(self):
         try:
-            os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-            os.environ['TRANSFORMERS_CACHE'] = '/tmp/transformers_cache'
-            os.environ['SENTENCE_TRANSFORMERS_HOME'] = '/tmp/sentence_transformers'
-            
             self.embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             
             all_texts = [
@@ -786,6 +564,7 @@ class RAGService:
             raise
     
     def search(self, query: str, k: int = Config.FAISS_RESULTS_COUNT) -> List[Dict]:
+        """Recherche optimisée dans FAISS"""
         try:
             query_embedding = self.embedding_model.encode([query])
             query_embedding = np.array(query_embedding).astype('float32')
@@ -809,320 +588,404 @@ class RAGService:
             logger.error(f"Erreur recherche FAISS: {str(e)}")
             return []
 
-# ============================================
-# FONCTION DE TRAITEMENT DES QUESTIONS
-# ============================================
-
-def process_question(question: str, history: List[Dict], groq_service, rag_service):
-    """Traite une question et retourne la réponse"""
+class ConversationManager:
+    """Gestionnaire de conversations"""
     
-    # Salutations
-    salutations = ["cc", "bonjour", "salut", "coucou", "hello", "akwe", "yo", "bonsoir", "hi"]
-    question_lower = question.lower().strip()
+    def __init__(self):
+        self.conversations: Dict[str, List[Dict]] = {}
     
-    if any(salut == question_lower for salut in salutations):
-        responses = [
-            "Je suis ANONTCHIGAN, assistante pour la sensibilisation au cancer du sein. Comment puis-je vous aider ? 💗",
-            "Bonjour ! Je suis ANONTCHIGAN. Que souhaitez-vous savoir sur le cancer du sein ? 🌸",
-            "ANONTCHIGAN à votre service. Posez-moi vos questions sur la prévention du cancer du sein. 😊"
-        ]
-        return {
-            "answer": random.choice(responses),
-            "method": "salutation",
-            "score": None
-        }
+    def get_history(self, user_id: str) -> List[Dict]:
+        return self.conversations.get(user_id, [])
     
-    # Recherche FAISS
-    logger.info("🔍 Recherche FAISS...")
-    faiss_results = rag_service.search(question)
-    
-    if not faiss_results:
-        return {
-            "answer": "Les informations disponibles ne couvrent pas ce point spécifique. Je vous recommande de consulter un professionnel de santé au Bénin pour des conseils adaptés. 💗",
-            "method": "no_result",
-            "score": None
-        }
-    
-    best_result = faiss_results[0]
-    similarity = best_result['similarity']
-    
-    logger.info(f"📊 Meilleure similarité: {similarity:.3f}")
-    
-    # Décision : Réponse directe vs Génération
-    if similarity >= Config.SIMILARITY_THRESHOLD:
-        logger.info(f"✅ Haute similarité → Réponse directe")
-        answer = best_result['answer']
+    def add_message(self, user_id: str, role: str, content: str):
+        if user_id not in self.conversations:
+            self.conversations[user_id] = []
         
-        if len(answer) > Config.MAX_ANSWER_LENGTH:
-            answer = answer[:Config.MAX_ANSWER_LENGTH-3] + "..."
+        self.conversations[user_id].append({"role": role, "content": content})
         
-        return {
-            "answer": answer,
-            "method": "json_direct",
-            "score": float(similarity)
-        }
-    
-    else:
-        logger.info(f"🤖 Similarité modérée → Génération Groq")
-        
-        # Préparer le contexte
-        context_parts = []
-        for i, result in enumerate(faiss_results[:3], 1):
-            answer_truncated = result['answer']
-            if len(answer_truncated) > 200:
-                answer_truncated = answer_truncated[:197] + "..."
-            context_parts.append(f"{i}. Q: {result['question']}\n   R: {answer_truncated}")
-        
-        context = "\n\n".join(context_parts)
-        
-        # Génération avec Groq
-        try:
-            if groq_service.available:
-                answer = groq_service.generate_response(question, context, history)
-                method = "groq_generated"
-            else:
-                answer = "Je vous recommande de consulter un professionnel de santé pour cette question spécifique. La prévention précoce est essentielle. 💗"
-                method = "fallback"
-        except Exception as e:
-            logger.warning(f"Génération échouée: {str(e)}")
-            answer = "Pour des informations précises sur ce sujet, veuillez consulter un médecin ou un centre de santé spécialisé au Bénin. 🌸"
-            method = "error_fallback"
-        
-        return {
-            "answer": answer,
-            "method": method,
-            "score": float(similarity)
-        }
+        if len(self.conversations[user_id]) > Config.MAX_HISTORY_LENGTH * 2:
+            self.conversations[user_id] = self.conversations[user_id][-Config.MAX_HISTORY_LENGTH * 2:]
 
 # ============================================
-# INITIALISATION DES SERVICES (CACHE)
+# INITIALISATION DES SERVICES
 # ============================================
 
 @st.cache_resource
-def load_services():
-    """Charge les services une seule fois"""
-    logger.info("🚀 Chargement des services...")
+def initialize_services():
+    """Initialise les services une seule fois"""
     groq = GroqService()
     rag = RAGService()
-    logger.info("✓ Services chargés")
-    return groq, rag
+    conv = ConversationManager()
+    return groq, rag, conv
+
+groq_service, rag_service, conversation_manager = initialize_services()
+
+# ============================================
+# INITIALISATION SESSION STATE
+# ============================================
+
+if 'user_id' not in st.session_state:
+    st.session_state.user_id = str(uuid.uuid4())
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+
+# ============================================
+# FONCTION DE TRAITEMENT (CODE ORIGINAL)
+# ============================================
+
+def process_question(question: str, user_id: str) -> Dict:
+    """Traite la question et retourne la réponse"""
+    try:
+        history = conversation_manager.get_history(user_id)
+        
+        # Gestion des salutations
+        salutations = ["cc","bonjour", "salut", "coucou", "hello", "akwe", "yo", "bonsoir", "hi"]
+        question_lower = question.lower().strip()
+        
+        if any(salut == question_lower for salut in salutations):
+            responses = [
+                "Je suis ANONTCHIGAN, assistante pour la sensibilisation au cancer du sein. Comment puis-je vous aider ? 💗",
+                "Bonjour ! Je suis ANONTCHIGAN. Que souhaitez-vous savoir sur le cancer du sein ? 🌸",
+                "ANONTCHIGAN à votre service. Posez-moi vos questions sur la prévention du cancer du sein. 😊"
+            ]
+            answer = random.choice(responses)
+            
+            conversation_manager.add_message(user_id, "user", question)
+            conversation_manager.add_message(user_id, "assistant", answer)
+            
+            return {
+                "answer": answer,
+                "status": "success",
+                "method": "salutation"
+            }
+        
+        # Recherche FAISS
+        logger.info("🔍 Recherche FAISS...")
+        faiss_results = rag_service.search(question)
+        
+        if not faiss_results:
+            answer = "Les informations disponibles ne couvrent pas ce point spécifique. Je vous recommande de consulter un professionnel de santé au Bénin pour des conseils adaptés. 💗"
+            conversation_manager.add_message(user_id, "user", question)
+            conversation_manager.add_message(user_id, "assistant", answer)
+            
+            return {
+                "answer": answer,
+                "status": "info",
+                "method": "no_result"
+            }
+        
+        best_result = faiss_results[0]
+        similarity = best_result['similarity']
+        
+        logger.info(f"📊 Meilleure similarité: {similarity:.3f}")
+        
+        # Décision : Réponse directe vs Génération
+        if similarity >= Config.SIMILARITY_THRESHOLD:
+            logger.info(f"✅ Haute similarité → Réponse directe")
+            answer = best_result['answer']
+            
+            if len(answer) > Config.MAX_ANSWER_LENGTH:
+                answer = answer[:Config.MAX_ANSWER_LENGTH-3] + "..."
+            
+            conversation_manager.add_message(user_id, "user", question)
+            conversation_manager.add_message(user_id, "assistant", answer)
+            
+            return {
+                "answer": answer,
+                "status": "success",
+                "method": "json_direct",
+                "score": float(similarity),
+                "matched_question": best_result['question']
+            }
+        else:
+            logger.info(f"🤖 Similarité modérée → Génération Groq")
+            
+            # Préparer le contexte
+            context_parts = []
+            for i, result in enumerate(faiss_results[:3], 1):
+                answer_truncated = result['answer']
+                if len(answer_truncated) > 200:
+                    answer_truncated = answer_truncated[:197] + "..."
+                context_parts.append(f"{i}. Q: {result['question']}\n   R: {answer_truncated}")
+            
+            context = "\n\n".join(context_parts)
+            
+            # Génération avec Groq
+            try:
+                if groq_service.available:
+                    generated_answer = groq_service.generate_response(question, context, history)
+                else:
+                    generated_answer = "Je vous recommande de consulter un professionnel de santé pour cette question spécifique. La prévention précoce est essentielle. 💗"
+            except Exception as e:
+                logger.warning(f"Génération échouée: {str(e)}")
+                generated_answer = "Pour des informations précises sur ce sujet, veuillez consulter un médecin ou un centre de santé spécialisé au Bénin. 🌸"
+            
+            conversation_manager.add_message(user_id, "user", question)
+            conversation_manager.add_message(user_id, "assistant", generated_answer)
+            
+            return {
+                "answer": generated_answer,
+                "status": "success",
+                "method": "groq_generated",
+                "score": float(similarity),
+                "context_used": len(faiss_results[:3])
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur: {str(e)}")
+        error_message = "Désolé, une erreur s'est produite. Veuillez réessayer."
+        
+        conversation_manager.add_message(user_id, "user", question)
+        conversation_manager.add_message(user_id, "assistant", error_message)
+        
+        return {
+            "answer": error_message,
+            "status": "error",
+            "method": "error"
+        }
 
 # ============================================
 # INTERFACE STREAMLIT
 # ============================================
 
-st.set_page_config(
-    page_title="ANONTCHIGAN",
-    page_icon="💗",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
-
-groq_service, rag_service = load_services()
-
-# Initialisation de l'état de session
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "show_quick_questions" not in st.session_state:
-    st.session_state.show_quick_questions = True
-if "is_typing" not in st.session_state:
-    st.session_state.is_typing = False
-
-# Navbar supérieure
-st.markdown("""
-<div class="top-navbar">
-    <div class="navbar-logo">
-        <span>🎀</span> ANONTCHIGAN
-    </div>
-    <div class="navbar-menu">
-        <a href="#">Accueil</a>
-        <a href="#">À Propos</a>
-        <a href="#" style="background: rgba(255,255,255,0.2);">Chatbot</a>
-        <a href="#">Prédiction</a>
-        <a href="#">Contact</a>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# Header avec avatar
-st.markdown("""
-<div class="bot-header-card">
-    <div class="bot-avatar-circle">🤖</div>
-    <div class="bot-header-text">
-        <h2>Assistant ANONTCHIGAN</h2>
-        <p>En ligne - Prêt à vous aider</p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# Bannière de bienvenue (affichée uniquement au début)
-if len(st.session_state.messages) == 0:
-    st.markdown("""
-    <div class="welcome-banner">
-        <div class="ribbon-icon">🎗️</div>
-        <h3>Bienvenue sur ANONTCHIGAN</h3>
-        <p>Je suis votre assistant virtuel pour répondre à vos questions sur le cancer du sein.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Zone de chat
-st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-
-# Message de bienvenue initial
-if len(st.session_state.messages) == 0:
-    st.markdown("""
-    <div class="bot-message-wrapper">
-        <div class="bot-mini-avatar">🤖</div>
-        <div class="bot-message-content">
-            Bonjour 👋 Je suis l'assistant ANONTCHIGAN.
-            <br><br>
-            Je peux vous aider avec des informations sur :
-            <ul>
-                <li>La prévention du cancer du sein</li>
-                <li>Les symptômes à surveiller</li>
-                <li>L'auto-examen des seins</li>
-                <li>Les ressources disponibles</li>
-            </ul>
-            <div class="info-box">
-                <span class="info-box-icon">⚠️</span>
-                <span class="info-box-text"><strong>Important :</strong> Je fournis des informations éducatives. Consultez toujours un médecin pour un diagnostic.</span>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# Afficher les messages de la conversation
-for message in st.session_state.messages:
-    if message["role"] == "user":
-        st.markdown(f'<div class="user-message">{message["content"]}</div>', unsafe_allow_html=True)
+def display_message(message: dict, is_user: bool):
+    """Affiche un message dans le chat"""
+    if is_user:
+        st.markdown(f'<div class="user-message">👤 {message["content"]}</div>', unsafe_allow_html=True)
     else:
-        # Formatage du message bot
-        content = message["content"]
+        st.markdown(f'<div class="bot-message">🎀 {message["content"]}</div>', unsafe_allow_html=True)
+
+# Header
+st.markdown("""
+<div class="main-header">
+    <h1>🎀 ANONTCHIGAN</h1>
+    <p>Votre Assistante IA pour la Sensibilisation au Cancer du Sein au Bénin</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Tabs pour navigation
+tab1, tab2, tab3 = st.tabs(["💬 Chatbot", "📊 Informations", "ℹ️ À Propos"])
+
+# ============================================
+# TAB 1: CHATBOT
+# ============================================
+
+with tab1:
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    
+    # Zone de messages
+    chat_placeholder = st.container()
+    
+    with chat_placeholder:
+        if len(st.session_state.chat_history) == 0:
+            st.markdown("""
+            <div class="info-box">
+                <h4>👋 Bienvenue !</h4>
+                <p>Je suis ANONTCHIGAN, votre assistante dédiée à la prévention du cancer du sein. 
+                Posez-moi vos questions sur les symptômes, la prévention, le dépistage ou tout autre sujet lié au cancer du sein. 💗</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            for msg in st.session_state.chat_history:
+                display_message(msg, msg["role"] == "user")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Zone de saisie
+    col1, col2 = st.columns([5, 1])
+    
+    with col1:
+        user_input = st.text_input(
+            "Votre question...",
+            key="user_input",
+            placeholder="Posez votre question sur le cancer du sein...",
+            label_visibility="collapsed"
+        )
+    
+    with col2:
+        send_button = st.button("Envoyer 💗")
+    
+    # Traitement de l'envoi
+    if send_button and user_input.strip():
+        # Ajouter le message utilisateur
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": user_input
+        })
         
-        # Détection des listes à puces et conversion en HTML
-        if '•' in content or '\n-' in content:
-            lines = content.split('\n')
-            formatted_lines = []
-            in_list = False
+        # Afficher un loader
+        with st.spinner("ANONTCHIGAN réfléchit..."):
+            # Obtenir la réponse
+            response = process_question(user_input, st.session_state.user_id)
             
-            for line in lines:
-                line = line.strip()
-                if line.startswith('•') or line.startswith('-'):
-                    if not in_list:
-                        formatted_lines.append('<ul>')
-                        in_list = True
-                    formatted_lines.append(f'<li>{line[1:].strip()}</li>')
-                else:
-                    if in_list:
-                        formatted_lines.append('</ul>')
-                        in_list = False
-                    if line:
-                        formatted_lines.append(line + '<br>')
-            
-            if in_list:
-                formatted_lines.append('</ul>')
-            
-            content = ''.join(formatted_lines)
+            # Ajouter la réponse du bot
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response["answer"]
+            })
         
-        st.markdown(f"""
-        <div class="bot-message-wrapper">
-            <div class="bot-mini-avatar">🤖</div>
-            <div class="bot-message-content">{content}</div>
+        # Rerun pour afficher les nouveaux messages
+        st.rerun()
+    
+    # Bouton pour effacer l'historique
+    if len(st.session_state.chat_history) > 0:
+        if st.button("🗑️ Effacer l'historique"):
+            st.session_state.chat_history = []
+            st.rerun()
+
+# ============================================
+# TAB 2: INFORMATIONS
+# ============================================
+
+with tab2:
+    st.markdown("### 📊 Statistiques Clés")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="stat-card">
+            <h3>1/8</h3>
+            <p>Femmes développent un cancer du sein</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="stat-card">
+            <h3>90%</h3>
+            <p>Taux de guérison si détecté tôt</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div class="stat-card">
+            <h3>40+</h3>
+            <p>Âge recommandé pour le dépistage</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown("### 🌸 Conseils de Prévention")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        <div class="info-box">
+            <h4>🏃‍♀️ Activité Physique</h4>
+            <p>Pratiquez au moins 30 minutes d'exercice modéré par jour pour réduire les risques.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="info-box">
+            <h4>🥗 Alimentation Saine</h4>
+            <p>Privilégiez les fruits, légumes et limitez l'alcool et les aliments transformés.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="info-box">
+            <h4>🔍 Auto-Examen</h4>
+            <p>Examinez vos seins mensuellement pour détecter toute anomalie.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="info-box">
+            <h4>👩‍⚕️ Dépistage Régulier</h4>
+            <p>Consultez un professionnel pour une mammographie à partir de 40 ans.</p>
         </div>
         """, unsafe_allow_html=True)
 
-# Indicateur de frappe (typing indicator)
-if st.session_state.is_typing:
-    st.markdown("""
-    <div class="typing-wrapper">
-        <div class="bot-mini-avatar">🤖</div>
-        <div class="typing-indicator">
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-            <div class="typing-dot"></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+# ============================================
+# TAB 3: À PROPOS
+# ============================================
 
-st.markdown('</div>', unsafe_allow_html=True)
-
-# Questions rapides (affichées uniquement au début)
-if st.session_state.show_quick_questions and len(st.session_state.messages) == 0:
+with tab3:
+    st.markdown("### 🎀 À Propos d'ANONTCHIGAN")
+    
     st.markdown("""
-    <div class="quick-questions-section">
-        <div class="quick-questions-title">Questions fréquentes :</div>
+    <div class="info-box">
+        <h4>Notre Mission</h4>
+        <p>ANONTCHIGAN est une assistante IA développée pour sensibiliser et informer sur le cancer du sein au Bénin. 
+        Notre objectif est de rendre l'information médicale accessible à tous et de promouvoir le dépistage précoce.</p>
     </div>
     """, unsafe_allow_html=True)
     
-    quick_questions = [
-        "Symptômes du cancer",
-        "Auto-examen",
-        "Facteurs de risque",
-        "Âge de dépistage"
-    ]
+    st.markdown("### 👨‍💻 Équipe de Développement")
     
-    cols = st.columns(2)
-    for i, q in enumerate(quick_questions):
-        col_idx = i % 2
-        if cols[col_idx].button(q, key=f"quick_{i}", use_container_width=True):
-            st.session_state.messages.append({"role": "user", "content": q})
-            st.session_state.show_quick_questions = False
-            st.session_state.is_typing = True
-            st.rerun()
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Créateurs :**
+        - Judicaël Karol DOBOEVI
+        - Ursus Hornel GBAGUIDI
+        - Abel Kokou KPOCOUTA
+        - Josaphat ADJELE
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Institution :**
+        - ENSGMM (École Nationale Supérieure de Génie Mathématique et Modélisation)
+        - Abomey, Bénin 🇧🇯
+        - Club d'Intelligence Artificielle
+        """)
+    
+    st.markdown("""
+    <div class="info-box">
+        <h4>⚙️ Technologies Utilisées</h4>
+        <p>
+        • Intelligence Artificielle (LLM Groq)<br>
+        • RAG (Retrieval-Augmented Generation)<br>
+        • FAISS pour la recherche sémantique<br>
+        • Sentence Transformers pour les embeddings<br>
+        • Streamlit pour l'interface
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    st.markdown("### ⚙️ État du Système")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        status = "✅ Disponible" if groq_service.available else "❌ Indisponible"
+        st.metric("Service Groq", status)
+    
+    with col2:
+        st.metric("Base de données", f"{len(rag_service.questions_data)} questions")
+    
+    with col3:
+        st.metric("Conversations actives", len(conversation_manager.conversations))
 
-# Zone d'input fixe en bas
-st.markdown('<div class="input-fixed-bottom"><div class="input-wrapper">', unsafe_allow_html=True)
+# ============================================
+# FOOTER
+# ============================================
 
-col1, col2 = st.columns([6, 1])
-
-with col1:
-    user_input = st.text_input(
-        "Message",
-        placeholder="Posez-moi une question...",
-        key="user_input",
-        label_visibility="collapsed"
-    )
-
-with col2:
-    send_button = st.button("➤", use_container_width=True, key="send_btn")
-
-st.markdown('</div></div>', unsafe_allow_html=True)
-
-# Traitement de l'envoi
-if send_button and user_input:
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    st.session_state.show_quick_questions = False
-    st.session_state.is_typing = True
-    st.rerun()
-
-# Génération de la réponse par le bot
-if st.session_state.is_typing and len(st.session_state.messages) > 0:
-    if st.session_state.messages[-1]["role"] == "user":
-        time.sleep(1.5)  # Simule le temps de réflexion
-        
-        result = process_question(
-            st.session_state.messages[-1]["content"],
-            [],
-            groq_service,
-            rag_service
-        )
-        
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": result["answer"]
-        })
-        st.session_state.is_typing = False
-        st.rerun()
-
-# Script pour scroll automatique vers le bas
 st.markdown("""
-<script>
-    // Scroll automatique
-    setTimeout(function() {
-        var chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    }, 100);
-</script>
+<div class="custom-footer">
+    <p><strong>ANONTCHIGAN</strong> - Octobre Rose 2024 🎀</p>
+    <p>Développé avec 💗 par le Club IA de l'ENSGMM</p>
+    <p><small>Pour toute urgence médicale, consultez immédiatement un professionnel de santé</small></p>
+</div>
 """, unsafe_allow_html=True)
+
+# ============================================
+# INFORMATIONS DE DÉMARRAGE
+# ============================================
+
+logger.info("\n" + "="*50)
+logger.info("✓ ANONTCHIGAN STREAMLIT - Prêt!")
+logger.info(f"  - Génération: {'Groq ⚡' if groq_service.available else 'Fallback'}")
+logger.info(f"  - Questions chargées: {len(rag_service.questions_data)}")
+logger.info(f"  - User ID: {st.session_state.user_id}")
+logger.info("="*50 + "\n")
