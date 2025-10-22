@@ -9,7 +9,6 @@ from sentence_transformers import SentenceTransformer
 import faiss
 import streamlit as st
 from datetime import datetime
-import streamlit.components.v1 as components
 
 # ============================================
 # CONFIGURATION
@@ -401,7 +400,7 @@ def load_services():
     return groq, rag
 
 # ============================================
-# MODE API JSON PUR (SANS INTERFACE)
+# MODE API JSON PUR - UTILISE st.text UNIQUEMENT
 # ============================================
 
 # Charger les services
@@ -413,11 +412,18 @@ query_params = st.query_params
 # SI PARAMÈTRE "api" EXISTE → MODE JSON PUR
 if "api" in query_params and "question" in query_params:
     
-    # MASQUER COMPLÈTEMENT STREAMLIT
+    # CSS minimal pour masquer Streamlit
     st.markdown("""
     <style>
-        * {display: none !important;}
-        html, body {margin: 0 !important; padding: 0 !important;}
+        #MainMenu, footer, header, .stDeployButton, 
+        div[data-testid="stToolbar"], 
+        div[data-testid="stDecoration"], 
+        div[data-testid="stStatusWidget"] {
+            display: none !important;
+        }
+        .block-container {
+            padding: 1rem !important;
+        }
     </style>
     """, unsafe_allow_html=True)
     
@@ -449,61 +455,11 @@ if "api" in query_params and "question" in query_params:
             "question": question
         }
     
-    # INJECTION DU JSON PUR DANS LE HTML
+    # AFFICHER LE JSON EN TEXTE BRUT (FACILEMENT PARSABLE)
     json_output = json.dumps(response_data, ensure_ascii=False, indent=2)
     
-    # Composant HTML qui injecte le JSON directement
-    html_component = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            body {{
-                margin: 0;
-                padding: 20px;
-                font-family: monospace;
-                background: #1e1e1e;
-                color: #d4d4d4;
-            }}
-            pre {{
-                white-space: pre-wrap;
-                word-wrap: break-word;
-                margin: 0;
-            }}
-            .json-container {{
-                background: #252526;
-                padding: 20px;
-                border-radius: 8px;
-                border: 1px solid #3c3c3c;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="json-container">
-            <pre id="jsonData">{json_output}</pre>
-        </div>
-        <script>
-            // Rendre le JSON accessible globalement
-            window.ANONTCHIGAN_RESPONSE = {json_output};
-            
-            // Pour récupération facile
-            console.log('ANONTCHIGAN Response:', window.ANONTCHIGAN_RESPONSE);
-            
-            // Message au parent si dans iframe
-            if (window.parent !== window) {{
-                window.parent.postMessage({{
-                    type: 'ANONTCHIGAN_RESPONSE',
-                    data: window.ANONTCHIGAN_RESPONSE
-                }}, '*');
-            }}
-        </script>
-    </body>
-    </html>
-    """
-    
-    components.html(html_component, height=600, scrolling=True)
+    # Utiliser st.text pour un affichage texte pur
+    st.text(json_output)
     
     # Arrêter l'exécution
     st.stop()
@@ -585,9 +541,9 @@ with tab2:
         st.info("Aucune conversation.")
 
 with tab3:
-    st.markdown("### 🔗 API GET - JSON Automatique")
+    st.markdown("### 🔗 API GET - JSON Direct")
     
-    st.success("✅ **JSON EXTRACTION AUTOMATISÉE - Pas besoin de parsing HTML !**")
+    st.success("✅ **MODE TEXTE PUR - JSON directement parsable sans HTML !**")
     
     current_url = "https://votre-app.streamlit.app"
     
@@ -598,86 +554,103 @@ with tab3:
     {current_url}/?api=true&question=VotreQuestion&user_id=user123
     ```
     
-    ### 🎯 Méthodes d'extraction SIMPLIFIÉES
+    ### 🎯 Extraction ULTRA SIMPLE
     
-    **1. Python (requête directe avec parsing auto):**
+    **1. Python (requests) - Version SIMPLE:**
     ```python
     import requests
-    import re
     import json
     
-    def get_anontchigan_response(question, user_id="user123"):
+    def get_anontchigan(question, user_id="user123"):
         url = "{current_url}"
         params = {{"api": "true", "question": question, "user_id": user_id}}
         
         response = requests.get(url, params=params)
-        html = response.text
         
-        # Extraction automatique du JSON
-        json_match = re.search(r'window\.ANONTCHIGAN_RESPONSE = (\{{.*?\}});', html, re.DOTALL)
+        # Le contenu est du JSON pur dans le texte brut
+        # Extraire uniquement les lignes JSON (ignorer le HTML)
+        lines = response.text.split('\\n')
+        json_lines = [line for line in lines if line.strip().startswith('{{')]
         
-        if json_match:
-            data = json.loads(json_match.group(1))
-            return data
-        
-        # Fallback : extraction depuis <pre>
-        pre_match = re.search(r'<pre[^>]*>(.*?)</pre>', html, re.DOTALL)
-        if pre_match:
-            json_text = pre_match.group(1).strip()
+        if json_lines:
+            json_text = '\\n'.join(json_lines)
             return json.loads(json_text)
         
         return None
     
     # Utilisation
-    result = get_anontchigan_response("Quels sont les symptômes ?")
+    result = get_anontchigan("Symptômes du cancer du sein")
     if result and result['success']:
         print(result['data']['answer'])
     ```
     
-    **2. JavaScript (avec window.ANONTCHIGAN_RESPONSE):**
+    **2. Python - Version REGEX (plus robuste):**
+    ```python
+    import requests
+    import json
+    import re
+    
+    def get_anontchigan(question, user_id="user123"):
+        url = "{current_url}"
+        params = {{"api": "true", "question": question, "user_id": user_id}}
+        
+        response = requests.get(url, params=params)
+        
+        # Chercher le bloc JSON complet
+        match = re.search(r'(\\{{[\\s\\S]*?"success":[\\s\\S]*?\\}})', response.text)
+        
+        if match:
+            return json.loads(match.group(1))
+        
+        return None
+    
+    # Utilisation
+    result = get_anontchigan("Quels sont les symptômes ?")
+    print(result['data']['answer'])
+    ```
+    
+    **3. JavaScript (fetch):**
     ```javascript
-    async function getAnontchiganResponse(question, userId = 'user123') {{
+    async function getAnontchigan(question, userId = 'user123') {{
         const url = `{current_url}/?api=true&question=${{encodeURIComponent(question)}}&user_id=${{userId}}`;
         
         const response = await fetch(url);
-        const html = await response.text();
+        const text = await response.text();
         
-        // Extraction automatique
-        const match = html.match(/window\.ANONTCHIGAN_RESPONSE = (\{{.*?\}});/s);
+        // Extraire le JSON du texte
+        const match = text.match(/(\\{{[\\s\\S]*?"success":[\\s\\S]*?\\}})/);
         
         if (match) {{
             return JSON.parse(match[1]);
         }}
         
-        // Fallback
-        const preMatch = html.match(/<pre[^>]*>(.*?)<\/pre>/s);
-        if (preMatch) {{
-            return JSON.parse(preMatch[1]);
-        }}
-        
         return null;
     }}
     
     // Utilisation
-    const result = await getAnontchiganResponse("Symptômes cancer sein");
+    const result = await getAnontchigan("Symptômes cancer sein");
     if (result && result.success) {{
         console.log(result.data.answer);
     }}
     ```
     
-    **3. PHP (extraction simplifiée):**
+    **4. cURL + jq:**
+    ```bash
+    curl -s "{current_url}/?api=true&question=Symptômes&user_id=test" | \\
+        grep -E '^\\{{' | \\
+        jq '.data.answer'
+    ```
+    
+    **5. PHP:**
     ```php
-    function getAnontchiganResponse($question, $userId = 'user123') {{
+    function getAnontchigan($question, $userId = 'user123') {{
         $url = '{current_url}/?api=true&question=' . urlencode($question) . '&user_id=' . $userId;
-        $html = file_get_contents($url);
+        $response = file_get_contents($url);
         
-        // Extraction avec window.ANONTCHIGAN_RESPONSE
-        if (preg_match('/window\.ANONTCHIGAN_RESPONSE = (\{{.*?\}});/s', $html, $matches)) {{
-            return json_decode($matches[1], true);
-        }}
+        // Extraire le JSON
+        preg_match('/(\\{{[\\s\\S]*?"success":[\\s\\S]*?\\}})/', $response, $matches);
         
-        // Fallback : depuis <pre>
-        if (preg_match('/<pre[^>]*>(.*?)<\/pre>/s', $html, $matches)) {{
+        if ($matches) {{
             return json_decode($matches[1], true);
         }}
         
@@ -685,33 +658,19 @@ with tab3:
     }}
     
     // Utilisation
-    $result = getAnontchiganResponse('Symptômes cancer sein');
+    $result = getAnontchigan('Symptômes');
     if ($result && $result['success']) {{
         echo $result['data']['answer'];
     }}
     ```
     
-    **4. cURL + jq (ligne de commande):**
-    ```bash
-    # Extraction directe avec regex
-    curl -s "{current_url}/?api=true&question=Symptômes&user_id=test" | \\
-        grep -oP 'window\.ANONTCHIGAN_RESPONSE = \K\{{.*?\}}(?=;)' | \\
-        jq '.data.answer'
+    ### 🔥 Avantages
     
-    # Ou extraction depuis <pre>
-    curl -s "{current_url}/?api=true&question=Symptômes&user_id=test" | \\
-        sed -n '/<pre/,/<\/pre>/p' | \\
-        sed 's/<[^>]*>//g' | \\
-        jq '.data.answer'
-    ```
-    
-    ### 🔥 Avantages de cette méthode
-    
-    - ✅ **Extraction automatique** via `window.ANONTCHIGAN_RESPONSE`
-    - ✅ **Fallback** vers `<pre>` si nécessaire
-    - ✅ **JSON pur** sans encodage HTML
-    - ✅ **Compatible CORS** (tous paramètres ouverts)
-    - ✅ **Pas de parsing complexe** requis
+    - ✅ **JSON visible en texte brut** dans la réponse
+    - ✅ **Extraction simple** avec regex basique
+    - ✅ **Pas de parsing HTML complexe**
+    - ✅ **Compatible tous langages**
+    - ✅ **CORS ouvert**
     """)
     
     st.markdown("---")
@@ -725,7 +684,7 @@ with tab3:
             st.code(api_url, language="text")
             
             # Afficher ce que vous allez recevoir
-            st.markdown("**Réponse JSON attendue:**")
+            st.markdown("**Réponse JSON attendue (dans le texte brut):**")
             result = process_question(test_question, [], groq_service, rag_service)
             response_example = {
                 "success": True,
@@ -740,12 +699,12 @@ with tab3:
             }
             st.json(response_example)
             
-            st.info("💡 Le JSON sera accessible via `window.ANONTCHIGAN_RESPONSE` ou dans `<pre id='jsonData'>`")
+            st.info("💡 Le JSON sera visible en texte brut, cherchez simplement le bloc `{\"success\": true...}`")
 
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v5.0.0 - Auto JSON Extraction</p>
+    <p>ANONTCHIGAN v6.0.0 - JSON Direct Mode</p>
     <p>Développé par le Club d'IA de l'ENSGMM 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
