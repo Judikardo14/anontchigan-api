@@ -8,6 +8,8 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 import streamlit as st
+from datetime import datetime
+import streamlit.components.v1 as components
 
 # ============================================
 # CONFIGURATION
@@ -399,49 +401,44 @@ def load_services():
     return groq, rag
 
 # ============================================
-# DÉTECTION MODE API
+# MODE API JSON PUR (SANS INTERFACE)
 # ============================================
 
-# Désactiver tous les éléments visuels Streamlit
-st.set_page_config(
-    page_title="ANONTCHIGAN API",
-    page_icon="💗",
-    layout="centered"
-)
+# Charger les services
+groq_service, rag_service = load_services()
 
-# Récupérer les paramètres URL
+# Récupérer les paramètres
 query_params = st.query_params
 
-# MODE API : Renvoie uniquement du JSON
-if "question" in query_params and query_params.get("format") == "json":
-    # Masquer complètement l'interface Streamlit
+# SI PARAMÈTRE "api" EXISTE → MODE JSON PUR
+if "api" in query_params and "question" in query_params:
+    
+    # MASQUER COMPLÈTEMENT STREAMLIT
     st.markdown("""
     <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        .stApp {background-color: white;}
-        .block-container {padding: 0 !important; max-width: 100% !important;}
+        * {display: none !important;}
+        html, body {margin: 0 !important; padding: 0 !important;}
     </style>
     """, unsafe_allow_html=True)
     
     question = query_params.get("question")
-    user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
+    user_id = query_params.get("user_id", f"api_user_{random.randint(1000, 9999)}")
     
     try:
-        # Charger les services
-        groq_service, rag_service = load_services()
-        
         # Traiter la question
         result = process_question(question, [], groq_service, rag_service)
         
+        # Créer la réponse JSON
         response_data = {
             "success": True,
-            "answer": result["answer"],
-            "method": result["method"],
-            "similarity_score": result["score"],
-            "user_id": user_id,
-            "question": question
+            "data": {
+                "timestamp": datetime.now().isoformat(),
+                "user_id": user_id,
+                "question": question,
+                "answer": result["answer"],
+                "method": result["method"],
+                "similarity_score": result["score"]
+            }
         }
         
     except Exception as e:
@@ -452,74 +449,303 @@ if "question" in query_params and query_params.get("format") == "json":
             "question": question
         }
     
-    # Afficher UNIQUEMENT le JSON
-    st.code(json.dumps(response_data, ensure_ascii=False, indent=2), language="json")
+    # INJECTION DU JSON PUR DANS LE HTML
+    json_output = json.dumps(response_data, ensure_ascii=False, indent=2)
     
-    # Bouton pour copier
-    st.download_button(
-        label="📋 Télécharger la réponse JSON",
-        data=json.dumps(response_data, ensure_ascii=False, indent=2),
-        file_name="response.json",
-        mime="application/json"
-    )
+    # Composant HTML qui injecte le JSON directement
+    html_component = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                margin: 0;
+                padding: 20px;
+                font-family: monospace;
+                background: #1e1e1e;
+                color: #d4d4d4;
+            }}
+            pre {{
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                margin: 0;
+            }}
+            .json-container {{
+                background: #252526;
+                padding: 20px;
+                border-radius: 8px;
+                border: 1px solid #3c3c3c;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="json-container">
+            <pre id="jsonData">{json_output}</pre>
+        </div>
+        <script>
+            // Rendre le JSON accessible globalement
+            window.ANONTCHIGAN_RESPONSE = {json_output};
+            
+            // Pour récupération facile
+            console.log('ANONTCHIGAN Response:', window.ANONTCHIGAN_RESPONSE);
+            
+            // Message au parent si dans iframe
+            if (window.parent !== window) {{
+                window.parent.postMessage({{
+                    type: 'ANONTCHIGAN_RESPONSE',
+                    data: window.ANONTCHIGAN_RESPONSE
+                }}, '*');
+            }}
+        </script>
+    </body>
+    </html>
+    """
     
+    components.html(html_component, height=600, scrolling=True)
+    
+    # Arrêter l'exécution
     st.stop()
 
 # ============================================
 # INTERFACE STREAMLIT NORMALE (si pas en mode API)
 # ============================================
 
-groq_service, rag_service = load_services()
+st.set_page_config(
+    page_title="ANONTCHIGAN",
+    page_icon="💗",
+    layout="centered"
+)
+
+# Initialisation historique
+if "conversation_log" not in st.session_state:
+    st.session_state.conversation_log = []
 
 st.markdown("""
 <div style="text-align: center; padding: 2rem;">
-    <h1>💗 ANONTCHIGAN API</h1>
-    <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+    <h1>💗 ANONTCHIGAN</h1>
+    <p>Assistante IA - Cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
 
-st.info("""
-### 🔗 Utiliser l'API en mode JSON
+tab1, tab2, tab3 = st.tabs(["💬 Chatbot", "📊 Historique", "🔗 API GET"])
 
-Pour obtenir une réponse en JSON pur, ajoutez `?format=json&question=VotreQuestion` à l'URL.
+with tab1:
+    st.markdown("### Posez votre question")
+    question = st.text_input("Votre question:", placeholder="Ex: Quels sont les symptômes ?")
+    
+    if st.button("🚀 Envoyer", type="primary"):
+        if question:
+            with st.spinner("Traitement..."):
+                try:
+                    result = process_question(question, [], groq_service, rag_service)
+                    
+                    entry = {
+                        "timestamp": datetime.now().isoformat(),
+                        "user_id": "web_user",
+                        "question": question,
+                        "answer": result["answer"],
+                        "method": result["method"],
+                        "similarity_score": result["score"]
+                    }
+                    st.session_state.conversation_log.append(entry)
+                    
+                    st.success("✅ Réponse générée !")
+                    st.markdown(f"**Réponse:** {result['answer']}")
+                    st.info(f"Méthode: {result['method']} | Score: {result['score']}")
+                    
+                except Exception as e:
+                    st.error(f"❌ Erreur: {str(e)}")
 
-**Exemple:**
-```
-https://votre-app.streamlit.app/?format=json&question=Symptômes+cancer+sein
-```
-""")
+with tab2:
+    st.markdown("### 📊 Historique des conversations")
+    
+    if st.session_state.conversation_log:
+        st.write(f"**Total:** {len(st.session_state.conversation_log)} conversations")
+        
+        json_data = json.dumps(st.session_state.conversation_log, ensure_ascii=False, indent=2)
+        st.download_button(
+            label="📥 Télécharger l'historique (JSON)",
+            data=json_data,
+            file_name=f"anontchigan_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json"
+        )
+        
+        for i, entry in enumerate(reversed(st.session_state.conversation_log[-10:]), 1):
+            with st.expander(f"#{i} - {entry['timestamp'][:19]}"):
+                st.markdown(f"**Question:** {entry['question']}")
+                st.markdown(f"**Réponse:** {entry['answer']}")
+                st.caption(f"Méthode: {entry['method']} | Score: {entry['similarity_score']}")
+        
+        if st.button("🗑️ Effacer l'historique"):
+            st.session_state.conversation_log = []
+            st.rerun()
+    else:
+        st.info("Aucune conversation.")
 
-# Interface de test
-st.markdown("### 🧪 Tester l'API")
-
-test_question = st.text_input("Entrez une question pour tester:", placeholder="Ex: Quels sont les symptômes du cancer du sein ?")
-
-if st.button("🚀 Tester"):
-    if test_question:
-        with st.spinner("Traitement..."):
-            try:
-                result = process_question(test_question, [], groq_service, rag_service)
-                
-                response_data = {
-                    "success": True,
+with tab3:
+    st.markdown("### 🔗 API GET - JSON Automatique")
+    
+    st.success("✅ **JSON EXTRACTION AUTOMATISÉE - Pas besoin de parsing HTML !**")
+    
+    current_url = "https://votre-app.streamlit.app"
+    
+    st.markdown(f"""
+    ### 📍 Format de l'URL
+    
+    ```
+    {current_url}/?api=true&question=VotreQuestion&user_id=user123
+    ```
+    
+    ### 🎯 Méthodes d'extraction SIMPLIFIÉES
+    
+    **1. Python (requête directe avec parsing auto):**
+    ```python
+    import requests
+    import re
+    import json
+    
+    def get_anontchigan_response(question, user_id="user123"):
+        url = "{current_url}"
+        params = {{"api": "true", "question": question, "user_id": user_id}}
+        
+        response = requests.get(url, params=params)
+        html = response.text
+        
+        # Extraction automatique du JSON
+        json_match = re.search(r'window\.ANONTCHIGAN_RESPONSE = (\{{.*?\}});', html, re.DOTALL)
+        
+        if json_match:
+            data = json.loads(json_match.group(1))
+            return data
+        
+        # Fallback : extraction depuis <pre>
+        pre_match = re.search(r'<pre[^>]*>(.*?)</pre>', html, re.DOTALL)
+        if pre_match:
+            json_text = pre_match.group(1).strip()
+            return json.loads(json_text)
+        
+        return None
+    
+    # Utilisation
+    result = get_anontchigan_response("Quels sont les symptômes ?")
+    if result and result['success']:
+        print(result['data']['answer'])
+    ```
+    
+    **2. JavaScript (avec window.ANONTCHIGAN_RESPONSE):**
+    ```javascript
+    async function getAnontchiganResponse(question, userId = 'user123') {{
+        const url = `{current_url}/?api=true&question=${{encodeURIComponent(question)}}&user_id=${{userId}}`;
+        
+        const response = await fetch(url);
+        const html = await response.text();
+        
+        // Extraction automatique
+        const match = html.match(/window\.ANONTCHIGAN_RESPONSE = (\{{.*?\}});/s);
+        
+        if (match) {{
+            return JSON.parse(match[1]);
+        }}
+        
+        // Fallback
+        const preMatch = html.match(/<pre[^>]*>(.*?)<\/pre>/s);
+        if (preMatch) {{
+            return JSON.parse(preMatch[1]);
+        }}
+        
+        return null;
+    }}
+    
+    // Utilisation
+    const result = await getAnontchiganResponse("Symptômes cancer sein");
+    if (result && result.success) {{
+        console.log(result.data.answer);
+    }}
+    ```
+    
+    **3. PHP (extraction simplifiée):**
+    ```php
+    function getAnontchiganResponse($question, $userId = 'user123') {{
+        $url = '{current_url}/?api=true&question=' . urlencode($question) . '&user_id=' . $userId;
+        $html = file_get_contents($url);
+        
+        // Extraction avec window.ANONTCHIGAN_RESPONSE
+        if (preg_match('/window\.ANONTCHIGAN_RESPONSE = (\{{.*?\}});/s', $html, $matches)) {{
+            return json_decode($matches[1], true);
+        }}
+        
+        // Fallback : depuis <pre>
+        if (preg_match('/<pre[^>]*>(.*?)<\/pre>/s', $html, $matches)) {{
+            return json_decode($matches[1], true);
+        }}
+        
+        return null;
+    }}
+    
+    // Utilisation
+    $result = getAnontchiganResponse('Symptômes cancer sein');
+    if ($result && $result['success']) {{
+        echo $result['data']['answer'];
+    }}
+    ```
+    
+    **4. cURL + jq (ligne de commande):**
+    ```bash
+    # Extraction directe avec regex
+    curl -s "{current_url}/?api=true&question=Symptômes&user_id=test" | \\
+        grep -oP 'window\.ANONTCHIGAN_RESPONSE = \K\{{.*?\}}(?=;)' | \\
+        jq '.data.answer'
+    
+    # Ou extraction depuis <pre>
+    curl -s "{current_url}/?api=true&question=Symptômes&user_id=test" | \\
+        sed -n '/<pre/,/<\/pre>/p' | \\
+        sed 's/<[^>]*>//g' | \\
+        jq '.data.answer'
+    ```
+    
+    ### 🔥 Avantages de cette méthode
+    
+    - ✅ **Extraction automatique** via `window.ANONTCHIGAN_RESPONSE`
+    - ✅ **Fallback** vers `<pre>` si nécessaire
+    - ✅ **JSON pur** sans encodage HTML
+    - ✅ **Compatible CORS** (tous paramètres ouverts)
+    - ✅ **Pas de parsing complexe** requis
+    """)
+    
+    st.markdown("---")
+    st.markdown("### 🧪 Tester l'API")
+    
+    test_question = st.text_input("Question de test:", key="api_test")
+    
+    if st.button("Tester l'API GET"):
+        if test_question:
+            api_url = f"{current_url}/?api=true&question={test_question}&user_id=test"
+            st.code(api_url, language="text")
+            
+            # Afficher ce que vous allez recevoir
+            st.markdown("**Réponse JSON attendue:**")
+            result = process_question(test_question, [], groq_service, rag_service)
+            response_example = {
+                "success": True,
+                "data": {
+                    "timestamp": datetime.now().isoformat(),
+                    "user_id": "test",
+                    "question": test_question,
                     "answer": result["answer"],
                     "method": result["method"],
-                    "similarity_score": result["score"],
-                    "question": test_question
+                    "similarity_score": result["score"]
                 }
-                
-                st.success("✅ Réponse générée !")
-                st.json(response_data)
-                
-            except Exception as e:
-                st.error(f"❌ Erreur: {str(e)}")
-    else:
-        st.warning("⚠️ Veuillez entrer une question")
+            }
+            st.json(response_example)
+            
+            st.info("💡 Le JSON sera accessible via `window.ANONTCHIGAN_RESPONSE` ou dans `<pre id='jsonData'>`")
 
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v3.0.0 - Mode API JSON</p>
+    <p>ANONTCHIGAN v5.0.0 - Auto JSON Extraction</p>
     <p>Développé par le Club d'IA de l'ENSGMM 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
