@@ -1,4 +1,4 @@
-import json
+import json  # noqa: F401
 import os
 import logging
 from typing import Dict, List, Optional
@@ -169,7 +169,7 @@ Conseils de prévention : seulement si pertinents et si demandés."""
     
     def _is_valid_answer(self, answer: str) -> bool:
         return (len(answer) >= Config.MIN_ANSWER_LENGTH and 
-                not answer.lower().startswith(('je ne sais pas', 'désolé', 'sorry')))
+                not answer_lower.startswith(('je ne sais pas', 'désolé', 'sorry')))
     
     def _ensure_complete_response(self, answer: str) -> str:
         if not answer:
