@@ -153,7 +153,7 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         return messages
     
     def _clean_response(self, answer: str) -> str:
-        unwanted_intros = ['__?]
+        unwanted_intros = ['__?']
         
         answer_lower = answer.lower()
         for phrase in unwanted_intros:
