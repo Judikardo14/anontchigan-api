@@ -155,11 +155,7 @@ Conseils de prévention : seulement si pertinents et si demandés."""
         return messages
     
     def _clean_response(self, answer: str) -> str:
-        unwanted_intros = [
-            'bonjour', 'salut', 'coucou', 'hello', 'akwè', 'yo', 'bonsoir', 'hi',
-            'excellente question', 'je suis ravi', 'permettez-moi', 'tout d abord',
-            'premièrement', 'pour commencer', 'en tant qu', 'je suis anontchigan'
-        ]
+        unwanted_intros = ['well','done']
         
         answer_lower = answer.lower()
         for phrase in unwanted_intros:
