@@ -1,0 +1,279 @@
+display: none;
+        z-index: 999;
+    }
+    .nav-menu.active { display: flex; }
+    .nav-menu a { padding: 0.8rem 1.5rem; width: 100%; }
+    .menu-toggle { display: block; }
+    .chat-container { margin: 0; height: calc(100vh - 120px); border-radius: 0; }
+    .message-content { max-width: 85%; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-container">
+<a href="https://abel123.pythonanywhere.com/" class="logo" target="_blank">
+<i class="fas fa-ribbon"></i>
+<span>ANONTCHIGAN</span>
+</a>
+<button class="menu-toggle" onclick="toggleMenu()">
+<i class="fas fa-bars"></i>
+</button>
+<ul class="nav-menu" id="navMenu">
+<li><a href="https://abel123.pythonanywhere.com/" target="_blank">Accueil</a></li>
+<li><a href="https://abel123.pythonanywhere.com/a-propos/" target="_blank">À Propos</a></li>
+<li><a href="#" class="active">Chatbot</a></li>
+<li><a href="https://abel123.pythonanywhere.com/predictor/" target="_blank">Prédiction</a></li>
+<li><a href="https://abel123.pythonanywhere.com/contact/" target="_blank">Contact</a></li>
+</ul>
+</div>
+</nav>
+
+<div class="chat-container">
+<div class="chat-header">
+<div class="chat-header-avatar"><i class="fas fa-robot"></i></div>
+<div class="chat-header-info">
+<h2>Assistant ANONTCHIGAN</h2>
+<p><i class="fas fa-circle" style="color: #4caf50; font-size: 0.6rem;"></i> En ligne</p>
+</div>
+</div>
+
+<div class="chat-messages" id="chatMessages">
+<div class="welcome-message">
+<i class="fas fa-ribbon"></i>
+<h3 style="color: var(--rose-dark); margin-bottom: 0.5rem;">Bienvenue sur ANONTCHIGAN</h3>
+<p>Je suis votre assistant virtuel pour le cancer du sein.</p>
+</div>
+
+<div class="message bot">
+<div class="message-avatar"><i class="fas fa-robot"></i></div>
+<div>
+<div class="message-content">
+<p>Bonjour ! 👋 Je suis l'assistant ANONTCHIGAN.</p>
+<p style="margin-top: 0.5rem;">Je peux vous aider avec :</p>
+<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">
+<li>La prévention du cancer du sein</li>
+<li>Les symptômes à surveiller</li>
+<li>L'auto-examen des seins</li>
+<li>Les ressources disponibles</li>
+</ul>
+<div class="disclaimer" style="margin-top: 1rem;">
+<i class="fas fa-info-circle"></i>
+<strong>Important :</strong> Consultez toujours un médecin pour un diagnostic.
+</div>
+</div>
+<div class="message-time">Maintenant</div>
+</div>
+</div>
+
+<div style="padding: 0 1rem;">
+<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Questions fréquentes :</p>
+<div class="quick-questions">
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les symptômes du cancer du sein ?')">Symptômes</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Comment faire l\\'auto-examen des seins ?')">Auto-examen</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les facteurs de risque ?')">Facteurs de risque</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('À partir de quel âge faire un dépistage ?')">Âge de dépistage</button>
+</div>
+</div>
+
+<div class="typing-indicator" id="typingIndicator">
+<div class="message-avatar" style="background: linear-gradient(135deg, var(--rose-primary), var(--violet)); color: #fff;">
+<i class="fas fa-robot"></i>
+</div>
+<div class="typing-dots">
+<span></span>
+<span></span>
+<span></span>
+</div>
+</div>
+</div>
+
+<div class="chat-input-container">
+<div class="chat-input-wrapper">
+<textarea id="chatInput" class="chat-input" placeholder="Posez votre question ici..." rows="1"></textarea>
+<button class="send-button" id="sendButton" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+</div>
+</div>
+</div>
+
+<script>
+// Variables globales
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendButton = document.getElementById('sendButton');
+const typingIndicator = document.getElementById('typingIndicator');
+
+// Fonction pour envoyer un message
+async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    addMessage(message, 'user');
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    chatInput.disabled = true;
+    sendButton.disabled = true;
+    typingIndicator.classList.add('active');
+    scrollToBottom();
+
+    try {
+        const apiUrl = window.location.origin + window.location.pathname + '?api=true&question=' + encodeURIComponent(message);
+        
+        console.log('🔍 Envoi à:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        console.log('✅ Réponse:', data);
+
+        typingIndicator.classList.remove('active');
+
+        if (data.success && data.answer) {
+            const sourceText = getSourceText(data.method);
+            addMessage(data.answer, 'bot', sourceText, data.method);
+        } else {
+            addMessage("❌ Erreur: " + (data.error || 'Réponse invalide'), 'bot');
+        }
+
+    } catch (error) {
+        typingIndicator.classList.remove('active');
+        addMessage("❌ Erreur de connexion: " + error.message, 'bot');
+        console.error('❌ Erreur:', error);
+    }
+
+    chatInput.disabled = false;
+    sendButton.disabled = false;
+    chatInput.focus();
+}
+
+// Fonction pour envoyer une question rapide
+function sendQuickQuestion(question) {
+    if (chatInput) {
+        chatInput.value = question;
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        sendMessage();
+    }
+}
+
+// Fonction pour ajouter un message
+function addMessage(text, sender, source, sourceType) {
+    if (!chatMessages || !typingIndicator) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ' + sender;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.innerHTML = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
+
+    const contentWrapper = document.createElement('div');
+    
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.innerHTML = formatMessage(text);
+
+    if (source && sender === 'bot') {
+        const sourceTag = document.createElement('div');
+        sourceTag.className = 'source-badge ' + sourceType;
+        sourceTag.innerHTML = '<i class="fas fa-info-circle"></i> ' + source;
+        content.appendChild(sourceTag);
+    }
+
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    contentWrapper.appendChild(content);
+    contentWrapper.appendChild(time);
+
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentWrapper);
+
+    chatMessages.insertBefore(messageDiv, typingIndicator);
+    scrollToBottom();
+}
+
+// Fonction pour formater les messages
+function formatMessage(text) {
+    if (!text) return '';
+    
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.+?)\*/g, '<strong>$1</strong>');
+    text = text.replace(/\n/g, '<br>');
+    text = text.replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>');
+    text = text.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+    
+    if (text.includes('<li>') && !text.includes('<ul>')) {
+        text = text.replace(/(<li>.*?<\/li>)/gs, '<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">$1</ul>');
+    }
+    
+    text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
+    text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
+    text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
+    
+    return text;
+}
+
+// Fonction pour obtenir le texte de la source
+function getSourceText(method) {
+    const map = {
+        'salutation': '🤝 Accueil',
+        'json_direct': '📚 Base FAQ',
+        'groq_generated': '🤖 IA Groq',
+        'no_result': 'ℹ Info',
+        'fallback': '💡 Conseil',
+        'error_fallback': '⚠ Erreur'
+    };
+    return map[method] || '💗 ANONTCHIGAN';
+}
+
+// Fonction pour scroller vers le bas
+function scrollToBottom() {
+    if (chatMessages) {
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 100);
+    }
+}
+
+// Fonction pour toggle le menu
+function toggleMenu() {
+    const menu = document.getElementById('navMenu');
+    if (menu) menu.classList.toggle('active');
+}
+
+// Event listeners
+document.querySelectorAll('.nav-menu a').forEach(link => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+            const menu = document.getElementById('navMenu');
+            if (menu) menu.classList.remove('active');
+        }
+    });
+});
+
+if (chatInput) {
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+    
+    chatInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+}
+
+window.addEventListener('load', () => {
+    if (chatInput) {
+        chatInput.focus();
+        console.log('✅ Interface chargée et prête');
+    }
+});
+</script>
+</body>
+</html>
