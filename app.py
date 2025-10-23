@@ -521,6 +521,58 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Documentation API
+    st.markdown("### 🔗 Utiliser l'API")
+    
+    # Récupérer l'URL de l'app
+    try:
+        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
+    except:
+        app_url = "https://votre-app.streamlit.app"
+    
+    st.markdown(f"""
+    <div class="api-info">
+        <h4>Méthode GET</h4>
+        <p>Envoyez vos questions via URL :</p>
+        <div class="api-code">
+{app_url}/?api=true&question=Votre+question
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="api-info">
+        <h4>📝 Exemple JavaScript</h4>
+        <div class="api-code">
+const question = "Symptômes cancer sein";<br>
+const url = `{URL}/?api=true&question=${encodeURIComponent(question)}`;<br>
+<br>
+fetch(url)<br>
+&nbsp;&nbsp;.then(res => res.json())<br>
+&nbsp;&nbsp;.then(data => console.log(data.answer));
+        </div>
+    </div>
+    """.replace("{URL}", app_url), unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="api-info">
+        <h4>🐍 Exemple Python</h4>
+        <div class="api-code">
+import requests<br>
+import urllib.parse<br>
+<br>
+question = "Symptômes cancer sein"<br>
+url = f"{URL}/?api=true&question={urllib.parse.quote(question)}"<br>
+<br>
+response = requests.get(url)<br>
+data = response.json()<br>
+print(data['answer'])
+        </div>
+    </div>
+    """.replace("{URL}", app_url), unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
     st.markdown("""
     ### 👥 Créateurs
     - Judicaël Karol DOBOEVI
