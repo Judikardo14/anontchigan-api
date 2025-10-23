@@ -565,10 +565,10 @@ with st.sidebar:
 
     <div class="navbar">
         <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
-        <a href="https://abel123.pythonanywhere.com/a-propos">À propos</a>
-        <a href="https://abel123.pythonanywhere.com/chatbot">Chatbot</a>
-        <a href="https://abel123.pythonanywhere.com/predictor">Prédiction</a>
-        <a href="https://abel123.pythonanywhere.com/contact">Contact</a>
+        <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
+        <a href="https://anontchigan-api.streamlit.app/">Chatbot</a>
+        <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
+        <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
     </div>
 """, unsafe_allow_html=True)
 
