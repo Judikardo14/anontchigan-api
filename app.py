@@ -495,10 +495,9 @@ st.markdown("""
 
 # Sidebar
 with st.sidebar:
-    st.header("ℹ️ Informations")
-    
+    st.header("ℹ️ Informations sur l'état du bot")
     col1, col2 = st.columns(2)
-    with col2:
+    with col1:
         groq_status = "✅ Activé" if groq_service.available else "❌ Désactivé"
         st.markdown(f"""
         <div class="stat-box">
@@ -547,7 +546,7 @@ with st.sidebar:
 
     /* --- Effet hover (survol) --- */
     .navbar a:hover {
-        background-color: #ff69b4; /* rose vif au survol */
+        background-color: #ff1493; /* rose vif au survol */
         transform: scale(1.05);
     }
 
