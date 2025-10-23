@@ -598,24 +598,27 @@ nav {
 
 <script>
 // ============================================
-// DÉCLARATION DE TOUTES LES FONCTIONS EN PREMIER
+// DÉCLARATION GLOBALE DES FONCTIONS (window scope)
 // ============================================
 
 // Variables globales
-let chatMessages, chatInput, sendButton, typingIndicator;
+window.chatMessages = null;
+window.chatInput = null;
+window.sendButton = null;
+window.typingIndicator = null;
 
-// Fonction pour envoyer un message
-async function sendMessage() {
-    const message = chatInput.value.trim();
+// Fonction pour envoyer un message (GLOBALE)
+window.sendMessage = async function() {
+    const message = window.chatInput.value.trim();
     if (!message) return;
 
-    addMessage(message, 'user');
-    chatInput.value = '';
-    chatInput.style.height = 'auto';
-    chatInput.disabled = true;
-    sendButton.disabled = true;
-    typingIndicator.classList.add('active');
-    scrollToBottom();
+    window.addMessage(message, 'user');
+    window.chatInput.value = '';
+    window.chatInput.style.height = 'auto';
+    window.chatInput.disabled = true;
+    window.sendButton.disabled = true;
+    window.typingIndicator.classList.add('active');
+    window.scrollToBottom();
 
     try {
         const apiUrl = window.location.origin + window.location.pathname + '?api=true&question=' + encodeURIComponent(message);
@@ -627,45 +630,45 @@ async function sendMessage() {
 
         console.log('✅ Réponse:', data);
 
-        typingIndicator.classList.remove('active');
+        window.typingIndicator.classList.remove('active');
 
         if (data.success && data.answer) {
-            const sourceText = getSourceText(data.method);
-            addMessage(data.answer, 'bot', sourceText, data.method);
+            const sourceText = window.getSourceText(data.method);
+            window.addMessage(data.answer, 'bot', sourceText, data.method);
         } else {
-            addMessage("❌ Erreur: " + (data.error || 'Réponse invalide'), 'bot');
+            window.addMessage("❌ Erreur: " + (data.error || 'Réponse invalide'), 'bot');
         }
 
     } catch (error) {
-        typingIndicator.classList.remove('active');
-        addMessage("❌ Erreur de connexion: " + error.message, 'bot');
+        window.typingIndicator.classList.remove('active');
+        window.addMessage("❌ Erreur de connexion: " + error.message, 'bot');
         console.error('❌ Erreur:', error);
     }
 
-    chatInput.disabled = false;
-    sendButton.disabled = false;
-    chatInput.focus();
+    window.chatInput.disabled = false;
+    window.sendButton.disabled = false;
+    window.chatInput.focus();
 }
 
-// Fonction pour envoyer une question rapide
-function sendQuickQuestion(question) {
-    if (chatInput) {
-        chatInput.value = question;
-        chatInput.style.height = 'auto';
-        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-        sendMessage();
+// Fonction pour envoyer une question rapide (GLOBALE)
+window.sendQuickQuestion = function(question) {
+    if (window.chatInput) {
+        window.chatInput.value = question;
+        window.chatInput.style.height = 'auto';
+        window.chatInput.style.height = Math.min(window.chatInput.scrollHeight, 120) + 'px';
+        window.sendMessage();
     }
 }
 
-// Fonction pour toggle le menu
-function toggleMenu() {
+// Fonction pour toggle le menu (GLOBALE)
+window.toggleMenu = function() {
     const menu = document.getElementById('navMenu');
     if (menu) menu.classList.toggle('active');
 }
 
-// Fonction pour ajouter un message
-function addMessage(text, sender, source, sourceType) {
-    if (!chatMessages || !typingIndicator) return;
+// Fonction pour ajouter un message (GLOBALE)
+window.addMessage = function(text, sender, source, sourceType) {
+    if (!window.chatMessages || !window.typingIndicator) return;
 
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message ' + sender;
@@ -678,7 +681,7 @@ function addMessage(text, sender, source, sourceType) {
     
     const content = document.createElement('div');
     content.className = 'message-content';
-    content.innerHTML = formatMessage(text);
+    content.innerHTML = window.formatMessage(text);
 
     if (source && sender === 'bot') {
         const sourceTag = document.createElement('div');
@@ -697,24 +700,55 @@ function addMessage(text, sender, source, sourceType) {
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentWrapper);
 
-    chatMessages.insertBefore(messageDiv, typingIndicator);
-    scrollToBottom();
+    window.chatMessages.insertBefore(messageDiv, window.typingIndicator);
+    window.scrollToBottom();
 }
 
 // Fonction pour formater les messages
 function formatMessage(text) {
     if (!text) return '';
     
+    // Remplacer les balises markdown
     text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*(.+?)\*/g, '<strong>$1</strong>');
-    text = text.replace(/\n/g, '<br>');
-    text = text.replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>');
-    text = text.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
     
-    if (text.includes('<li>') && !text.includes('<ul>')) {
-        text = text.replace(/(<li>.*?<\/li>)/gs, '<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">$1</ul>');
+    // Remplacer les sauts de ligne
+    text = text.replace(/\n/g, '<br>');
+    
+    // Convertir les listes numérotées
+    const lines = text.split('<br>');
+    let inList = false;
+    let result = [];
+    
+    for (let line of lines) {
+        if (/^\d+\.\s+/.test(line)) {
+            if (!inList) {
+                result.push('<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">');
+                inList = true;
+            }
+            result.push('<li>' + line.replace(/^\d+\.\s+/, '') + '</li>');
+        } else if (/^[-•]\s+/.test(line)) {
+            if (!inList) {
+                result.push('<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">');
+                inList = true;
+            }
+            result.push('<li>' + line.replace(/^[-•]\s+/, '') + '</li>');
+        } else {
+            if (inList) {
+                result.push('</ul>');
+                inList = false;
+            }
+            result.push(line);
+        }
     }
     
+    if (inList) {
+        result.push('</ul>');
+    }
+    
+    text = result.join('');
+    
+    // Styliser les emojis
     text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
     text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
     text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
