@@ -507,30 +507,68 @@ with st.sidebar:
         st.markdown(f"""
         <div class="stat-box">
             <h3>{groq_status}</h3>
-            <p>Groq AI</p>
+            <p>Anontchigan</p>
         </div>
         """, unsafe_allow_html=True)
     
     st.markdown("---")
     
     # Documentation API
-    st.markdown("### 🔗 Utiliser l'API")
+    #st.markdown("### 🔗 Utiliser l'API")
     
     # Récupérer l'URL de l'app
     try:
-        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
+        app_url = st.secrets.get("app_url", "https://anontchigan-api.streamlit.app")
     except:
-        app_url = "https://votre-app.streamlit.app"
-    
-    st.markdown(f"""
-    <div class="api-info">
-        <h4>Méthode GET</h4>
-        <p>Envoyez vos questions via URL :</p>
-        <div class="api-code">
-{app_url}/?api=true&question=Votre+question
-        </div>
+        app_url = "https://anontchigan-api.streamlit.app"
+
+st.markdown("""
+    <style>
+    /* Barre de navigation */
+    .navbar {
+        background-color: #0e1117;
+        overflow: hidden;
+        border-radius: 8px;
+        padding: 10px 0;
+        text-align: center;
+    }
+
+    /* Liens */
+    .navbar a {
+        float: none;
+        display: inline-block;
+        color: #f2f2f2;
+        text-align: center;
+        padding: 14px 20px;
+        text-decoration: none;
+        font-size: 18px;
+        transition: background 0.3s, color 0.3s;
+        border-radius: 6px;
+        margin: 0 4px;
+    }
+
+    /* Effet au survol */
+    .navbar a:hover {
+        background-color: #575757;
+        color: #fff;
+    }
+
+    /* Lien actif */
+    .navbar a.active {
+        background-color: #04AA6D;
+        color: white;
+    }
+    </style>
+
+    <div class="navbar">
+        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
+        <a href="https://abel123.pythonanywhere.com/about">À propos</a>
+        <a href="https://abel123.pythonanywhere.com/chatbot">Chatbot</a>
+        <a href="https://abel123.pythonanywhere.com/predictor">Prédiction</a>
+        <a href="https://abel123.pythonanywhere.com/contact">Contact</a>
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
+
     
     st.markdown("""
     <div class="api-info">
