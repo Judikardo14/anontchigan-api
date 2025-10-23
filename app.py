@@ -517,6 +517,17 @@ with st.sidebar:
             <h3>{groq_status}</h3>
             <p>Groq AI</p>
         </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+    
+    # Documentation API
+    st.markdown("### 🔗 Utiliser l'API")
+    
+    # Récupérer l'URL de l'app
+    try:
+        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
+    except:
+        app_url = "https://votre-app.streamlit.app"
         """, unsafe_allow_html=True)   
     
     st.markdown(f"""
