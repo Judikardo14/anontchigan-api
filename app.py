@@ -569,7 +569,6 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-    
     st.markdown("""
     <div class="api-info">
         <h4>📝 Exemple JavaScript</h4>
