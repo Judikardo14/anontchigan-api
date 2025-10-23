@@ -1,4 +1,272 @@
-import json
+<script>
+    // Variables globales
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendButton');
+    const typingIndicator = document.getElementById('typingIndicator');
+
+    // Toggle menu mobile
+    function toggleMenu() {
+        const menu = document.getElementById('navMenu');
+        if (menu) {
+            menu.classList.toggle('active');
+        }
+    }
+
+    // Fermer le menu mobile au clic sur un lien
+    document.querySelectorAll('.nav-menu a').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                const menu = document.getElementById('navMenu');
+                if (menu) {
+                    menu.classList.remove('active');
+                }
+            }
+        });
+    });
+
+    // Auto-resize textarea
+    if (chatInput) {
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+        
+        // CORRECTION: Enter pour envoyer (Shift+Enter pour nouvelle ligne)
+        chatInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    // Bouton d'envoi
+    if (sendButton) {
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            sendMessage();
+        });
+    }
+
+    // CORRECTION: Questions rapides fonctionnelles
+    function sendQuickQuestion(question) {
+        console.log('Question rapide cliquée:', question);
+        if (chatInput) {
+            chatInput.value = question;
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+            sendMessage();
+        }
+    }
+
+    // Attacher les événements aux boutons de questions rapides
+    document.addEventListener('DOMContentLoaded', function() {
+        const quickBtns = document.querySelectorAll('.quick-question-btn');
+        quickBtns.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const question = this.getAttribute('data-question') || this.textContent.trim();
+                sendQuickQuestion(question);
+            });
+        });
+    });
+
+    // FONCTION D'ENVOI DE MESSAGE
+    async function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) {
+            console.log('Message vide, annulation');
+            return;
+        }
+
+        console.log('Envoi du message:', message);
+
+        // Afficher le message utilisateur
+        addMessage(message, 'user');
+        
+        // Réinitialiser le champ
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+        
+        // Afficher l'indicateur de saisie
+        typingIndicator.classList.add('active');
+        scrollToBottom();
+
+        try {
+            // CORRECTION: Utiliser parent.window.location pour obtenir l'URL Streamlit
+            const baseUrl = window.parent.location.origin;
+            const apiUrl = `${baseUrl}/?api=true&question=${encodeURIComponent(message)}`;
+            
+            console.log('Appel API:', apiUrl);
+
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+
+            console.log('Réponse API:', data);
+
+            // Masquer l'indicateur
+            typingIndicator.classList.remove('active');
+
+            if (data.success && data.answer) {
+                const sourceText = getSourceText(data.method);
+                addMessage(data.answer, 'bot', sourceText, data.method);
+            } else {
+                addMessage("❌ Impossible de récupérer une réponse. Veuillez réessayer.", 'bot');
+            }
+
+        } catch (error) {
+            console.error('Erreur lors de l\'envoi:', error);
+            typingIndicator.classList.remove('active');
+            addMessage("❌ Erreur de connexion. Veuillez réessayer dans quelques instants.", 'bot');
+        }
+
+        // Réactiver les champs
+        chatInput.disabled = false;
+        sendButton.disabled = false;
+        chatInput.focus();
+    }
+
+    // AJOUTER UN MESSAGE AU CHAT
+    function addMessage(text, sender, source = null, sourceType = null) {
+        if (!chatMessages || !typingIndicator) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ' + sender;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerHTML = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
+
+        const contentWrapper = document.createElement('div');
+        
+        const content = document.createElement('div');
+        content.className = 'message-content';
+        content.innerHTML = formatMessage(text);
+
+        // Badge de source pour les messages du bot
+        if (source && sender === 'bot') {
+            const sourceTag = document.createElement('div');
+            sourceTag.className = 'source-badge ' + sourceType;
+            sourceTag.innerHTML = '<i class="fas fa-info-circle"></i> ' + source;
+            content.appendChild(sourceTag);
+        }
+
+        const time = document.createElement('div');
+        time.className = 'message-time';
+        time.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+        contentWrapper.appendChild(content);
+        contentWrapper.appendChild(time);
+
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentWrapper);
+
+        // Insérer avant l'indicateur de saisie
+        chatMessages.insertBefore(messageDiv, typingIndicator);
+        scrollToBottom();
+    }
+
+    // FORMATER LE MESSAGE (Markdown simple)
+    function formatMessage(text) {
+        if (!text) return '';
+        
+        // Gras
+        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.+?)\*/g, '<strong>$1</strong>');
+        
+        // Retours à la ligne
+        text = text.replace(/\n/g, '<br>');
+        
+        // Listes numérotées
+        text = text.replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>');
+        
+        // Listes à puces
+        text = text.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+        
+        // Wrapper les listes
+        if (text.includes('<li>') && !text.includes('<ul>')) {
+            text = text.replace(/(<li>.*?<\/li>)/gs, '<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">$1</ul>');
+        }
+        
+        // Emojis mis en valeur
+        text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
+        text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
+        text = text.replace(/⚠/g, '<span style="color: #FF9800;">⚠</span>');
+        text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
+        text = text.replace(/😊/g, '<span style="font-size: 1.1em;">😊</span>');
+        
+        return text;
+    }
+
+    // OBTENIR LE TEXTE DE SOURCE
+    function getSourceText(method) {
+        const methodMap = {
+            'salutation': '🤝 Accueil',
+            'json_direct': '📚 Base FAQ',
+            'groq_generated': '🤖 IA Groq',
+            'no_result': 'ℹ Info générale',
+            'error': '⚠ Erreur',
+            'fallback': '💡 Conseil',
+            'error_fallback': '⚠ Erreur'
+        };
+        return methodMap[method] || '💗 ANONTCHIGAN';
+    }
+
+    // SCROLL VERS LE BAS
+    function scrollToBottom() {
+        if (chatMessages) {
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 100);
+        }
+    }
+
+    // INITIALISATION AU CHARGEMENT
+    window.addEventListener('load', () => {
+        console.log('✅ Interface ANONTCHIGAN chargée');
+        
+        if (chatInput) {
+            chatInput.focus();
+        }
+        
+        // Animation d'entrée
+        setTimeout(() => {
+            const container = document.querySelector('.chat-container');
+            if (container) {
+                container.style.opacity = '1';
+                container.style.transform = 'translateY(0)';
+            }
+        }, 100);
+    });
+
+    // Style d'animation initial
+    const container = document.querySelector('.chat-container');
+    if (container) {
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(20px)';
+        container.style.transition = 'all 0.5s ease';
+    }
+</script>
+
+</body>
+</html>
+"""
+
+# Afficher l'interface avec components.html
+components.html(html_code, height=800, scrolling=False)
+
+# Initialisation de la session
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
+
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []import json
 import os
 import logging
 from typing import Dict, List, Optional
@@ -15,8 +283,8 @@ import sys
 # ============================================
 
 st.set_page_config(
-    page_title="ANONTCHIGAN",
-    page_icon="💗🎗️",
+    page_title="ANONTCHIGAN API",
+    page_icon="💗",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -482,6 +750,9 @@ html_code = """
             background: linear-gradient(135deg, var(--rose-primary) 0%, var(--violet) 100%);
             padding: 1rem 0;
             box-shadow: var(--ombre);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
 
         .nav-container {
@@ -491,6 +762,7 @@ html_code = """
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: relative;
         }
 
         .logo {
@@ -507,11 +779,40 @@ html_code = """
             font-size: 2rem;
         }
 
+        .nav-menu {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-menu a {
+            color: var(--blanc);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-menu a:hover, .nav-menu a.active {
+            background-color: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--blanc);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
         .chat-container {
             max-width: 1000px;
             margin: 1rem auto;
-            height: calc(100vh - 120px);
-            min-height: 600px;
+            height: calc(100vh - 180px);
+            min-height: 500px;
             display: flex;
             flex-direction: column;
             background: var(--blanc);
@@ -750,6 +1051,7 @@ html_code = """
         .quick-question-btn:hover {
             background: var(--rose-primary);
             color: var(--blanc);
+            transform: translateY(-2px);
         }
 
         .welcome-message {
@@ -816,10 +1118,45 @@ html_code = """
             border-radius: 10px;
         }
 
+        /* RESPONSIVE */
         @media (max-width: 768px) {
+            .nav-container {
+                position: relative;
+            }
+
+            .nav-menu {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: linear-gradient(135deg, var(--rose-primary) 0%, var(--violet) 100%);
+                flex-direction: column;
+                padding: 0.5rem 0;
+                gap: 0;
+                display: none;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                z-index: 999;
+            }
+
+            .nav-menu.active {
+                display: flex;
+            }
+
+            .nav-menu a {
+                padding: 0.8rem 1.5rem;
+                width: 100%;
+                display: block;
+                text-align: left;
+            }
+
+            .menu-toggle {
+                display: block;
+                padding: 0.5rem;
+            }
+
             .chat-container {
                 margin: 0;
-                height: 100vh;
+                height: calc(100vh - 120px);
                 border-radius: 0;
             }
 
@@ -845,10 +1182,20 @@ html_code = """
 
 <nav>
     <div class="nav-container">
-        <a href="#" class="logo">
+        <a href="https://abel123.pythonanywhere.com/" class="logo" target="_blank">
             <i class="fas fa-ribbon"></i>
             <span>ANONTCHIGAN</span>
         </a>
+        <button class="menu-toggle" onclick="toggleMenu()">
+            <i class="fas fa-bars"></i>
+        </button>
+        <ul class="nav-menu" id="navMenu">
+            <li><a href="https://abel123.pythonanywhere.com/" target="_blank">Accueil</a></li>
+            <li><a href="https://abel123.pythonanywhere.com/a-propos/" target="_blank">À Propos</a></li>
+            <li><a href="#" class="active">Chatbot</a></li>
+            <li><a href="https://abel123.pythonanywhere.com/prediction/" target="_blank">Prédiction</a></li>
+            <li><a href="https://abel123.pythonanywhere.com/contact/" target="_blank">Contact</a></li>
+        </ul>
     </div>
 </nav>
 
@@ -896,16 +1243,16 @@ html_code = """
         <div style="padding: 0 1rem;">
             <p style="font-size: 0.9rem; color: var(--gris-fonce); margin-bottom: 0.5rem;">Questions fréquentes :</p>
             <div class="quick-questions">
-                <button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les symptômes du cancer du sein ?')">
+                <button class="quick-question-btn" data-question="Quels sont les symptômes du cancer du sein ?">
                     Symptômes du cancer
                 </button>
-                <button class="quick-question-btn" onclick="sendQuickQuestion('Comment faire l\\'auto-examen des seins ?')">
+                <button class="quick-question-btn" data-question="Comment faire l'auto-examen des seins ?">
                     Auto-examen
                 </button>
-                <button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les facteurs de risque ?')">
+                <button class="quick-question-btn" data-question="Quels sont les facteurs de risque ?">
                     Facteurs de risque
                 </button>
-                <button class="quick-question-btn" onclick="sendQuickQuestion('À partir de quel âge faire un dépistage ?')">
+                <button class="quick-question-btn" data-question="À partir de quel âge faire un dépistage ?">
                     Âge de dépistage
                 </button>
             </div>
