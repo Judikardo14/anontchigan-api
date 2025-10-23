@@ -667,11 +667,11 @@ if question := st.chat_input("Posez votre question sur le cancer du sein..."):
                 st.markdown(answer)
                 
                 # Afficher les métadonnées (optionnel)
-                '''with st.expander("ℹ️ Détails de la réponse"):
-                    st.write(f"**Méthode:** {method}")
-                    if score is not None:
-                        st.write(f"**Score de similarité:** {score:.3f}")
-                    st.write(f"**User ID:** {st.session_state.user_id}")'''
+                #with st.expander("ℹ️ Détails de la réponse"):
+                    #st.write(f"**Méthode:** {method}")
+                    #if score is not None:
+                        #st.write(f"**Score de similarité:** {score:.3f}")
+                    #st.write(f"**User ID:** {st.session_state.user_id}")
                 
                 # Ajouter à l'historique
                 st.session_state.messages.append({"role": "assistant", "content": answer})
