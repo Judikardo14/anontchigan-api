@@ -502,14 +502,6 @@ with st.sidebar:
     st.header("ℹ️ Informations")
     
     col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{len(rag_service.questions_data)}</h3>
-            <p>Questions</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
     with col2:
         groq_status = "✅ Activé" if groq_service.available else "❌ Désactivé"
         st.markdown(f"""
