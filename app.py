@@ -535,6 +535,8 @@ with st.sidebar:
     .navbar a:hover {
         background-color: #ff1493; /* rose vif au survol */
         transform: scale(1.05);
+        color: white;
+        font-weight: bold;
     }
 
     /* --- Bouton actif (page actuelle) --- */
