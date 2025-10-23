@@ -518,7 +518,8 @@ with st.sidebar:
             <p>Groq AI</p>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown("---")
+    
+    st.markdown("---")
     
     # Documentation API
     st.markdown("### 🔗 Utiliser l'API")
@@ -528,7 +529,6 @@ with st.sidebar:
         app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
     except:
         app_url = "https://votre-app.streamlit.app"
-        """, unsafe_allow_html=True)   
     
     st.markdown(f"""
     <div class="api-info">
@@ -656,7 +656,7 @@ if question := st.chat_input("Posez votre question sur le cancer du sein..."):
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v0.1 - Développé par le Club d'IA de l'ENSGMM</p>
+    <p>ANONTCHIGAN v0.0.1 - Développé par le Club d'IA de l'ENSGMM</p>
     <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
