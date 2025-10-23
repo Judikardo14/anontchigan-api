@@ -471,6 +471,21 @@ st.markdown("""
         border-radius: 8px;
         text-align: center;
     }
+    .api-info {
+        background: #e8f4f8;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #0066cc;
+        margin-bottom: 1rem;
+    }
+    .api-code {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 0.85em;
+        overflow-x: auto;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -522,4 +537,74 @@ with st.sidebar:
         st.session_state.conversation_history = []
         st.rerun()
 
-# Initialisation
+# Initialisation de la session
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
+
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
+# Afficher l'historique des messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Input utilisateur
+if question := st.chat_input("Posez votre question sur le cancer du sein..."):
+    # Ajouter la question de l'utilisateur
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
+    
+    # Traiter la question
+    with st.chat_message("assistant"):
+        with st.spinner("Je réfléchis..."):
+            try:
+                result = process_question(
+                    question, 
+                    st.session_state.conversation_history,
+                    groq_service,
+                    rag_service
+                )
+                
+                answer = result["answer"]
+                method = result["method"]
+                score = result["score"]
+                
+                # Afficher la réponse
+                st.markdown(answer)
+                
+                # Afficher les métadonnées (optionnel)
+                with st.expander("ℹ️ Détails de la réponse"):
+                    st.write(f"**Méthode:** {method}")
+                    if score is not None:
+                        st.write(f"**Score de similarité:** {score:.3f}")
+                    st.write(f"**User ID:** {st.session_state.user_id}")
+                
+                # Ajouter à l'historique
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                
+                # Mettre à jour l'historique de conversation
+                st.session_state.conversation_history.append({"role": "user", "content": question})
+                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
+                
+                # Limiter l'historique
+                if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
+                    st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
+                
+            except Exception as e:
+                error_message = f"❌ Erreur: {str(e)}"
+                st.error(error_message)
+                logger.error(error_message)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #888;">
+    <p>ANONTCHIGAN v2.3.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
+    <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+</div>
+""", unsafe_allow_html=True)
