@@ -495,19 +495,6 @@ st.markdown("""
 
 # Sidebar
 with st.sidebar:
-    st.header("ℹ️ Informations sur l'état du bot")
-    col1, col2 = st.columns(2)
-    with col1:
-        groq_status = "✅ Activé" if groq_service.available else "❌ Désactivé"
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{groq_status}</h3>
-            <p>Anontchigan</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
     # Documentation API
     #st.markdown("### 🔗 Utiliser l'API")
     
@@ -570,7 +557,7 @@ with st.sidebar:
     st.markdown("---")
     
     st.markdown("""
-    ### 👥 Créateurs
+    ### Développé par:
     - Judicaël Karol DOBOEVI
     - Ursus Hornel GBAGUIDI
     - Abel Kokou KPOCOUTA
