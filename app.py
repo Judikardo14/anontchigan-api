@@ -737,16 +737,15 @@ async function sendMessage() {
     scrollToBottom();
 
     try {
-        const currentUrl = window.location.href;
-        const baseUrl = currentUrl.split('?')[0];
-        const apiUrl = baseUrl + '?api=true&question=' + encodeURIComponent(message);
+        // CORRECTION CRITIQUE ICI: Construction correcte de l'URL API
+        const apiUrl = window.location.origin + window.location.pathname + '?api=true&question=' + encodeURIComponent(message);
         
-        console.log('Envoi de la requête à:', apiUrl);
+        console.log('🔍 Envoi à:', apiUrl);
         
         const response = await fetch(apiUrl);
         const data = await response.json();
 
-        console.log('Réponse reçue:', data);
+        console.log('✅ Réponse:', data);
 
         typingIndicator.classList.remove('active');
 
@@ -754,13 +753,13 @@ async function sendMessage() {
             const sourceText = getSourceText(data.method);
             addMessage(data.answer, 'bot', sourceText, data.method);
         } else {
-            addMessage("❌ Impossible de récupérer une réponse. Erreur: " + (data.error || 'inconnue'), 'bot');
+            addMessage("❌ Erreur: " + (data.error || 'Réponse invalide'), 'bot');
         }
 
     } catch (error) {
         typingIndicator.classList.remove('active');
-        addMessage("❌ Erreur de connexion. Veuillez réessayer. Détails: " + error.message, 'bot');
-        console.error('Erreur complète:', error);
+        addMessage("❌ Erreur de connexion: " + error.message, 'bot');
+        console.error('❌ Erreur:', error);
     }
 
     chatInput.disabled = false;
@@ -848,7 +847,7 @@ function scrollToBottom() {
 window.addEventListener('load', () => {
     if (chatInput) {
         chatInput.focus();
-        console.log('Interface chargée et prête');
+        console.log('✅ Interface chargée');
     }
 });
 </script>
