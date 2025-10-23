@@ -1043,4 +1043,5 @@ if "conversation_history" not in st.session_state:
 <li><a href="https://abel123.pythonanywhere.com/a-propos/" target="_blank">À Propos</a></li>
 <li><a href="#" class="active">Chatbot</a></li>
 <li><a href="https://abel123.pythonanywhere.com/predictor/" target="_blank">Prédiction</a></li>
-<li><a href="https://abel123.pythonanywhere
+st.markdown('<li><a href="https://abel123.pythonanywhere.me/" target="_blank">Accueil</a></li>', unsafe_allow_html=True)
+
