@@ -595,6 +595,195 @@ nav {
 </style>
 </head>
 <body>
+
+<script>
+// ============================================
+// DÉCLARATION DE TOUTES LES FONCTIONS EN PREMIER
+// ============================================
+
+// Variables globales
+let chatMessages, chatInput, sendButton, typingIndicator;
+
+// Fonction pour envoyer un message
+async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    addMessage(message, 'user');
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    chatInput.disabled = true;
+    sendButton.disabled = true;
+    typingIndicator.classList.add('active');
+    scrollToBottom();
+
+    try {
+        const apiUrl = window.location.origin + window.location.pathname + '?api=true&question=' + encodeURIComponent(message);
+        
+        console.log('🔍 Envoi à:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        console.log('✅ Réponse:', data);
+
+        typingIndicator.classList.remove('active');
+
+        if (data.success && data.answer) {
+            const sourceText = getSourceText(data.method);
+            addMessage(data.answer, 'bot', sourceText, data.method);
+        } else {
+            addMessage("❌ Erreur: " + (data.error || 'Réponse invalide'), 'bot');
+        }
+
+    } catch (error) {
+        typingIndicator.classList.remove('active');
+        addMessage("❌ Erreur de connexion: " + error.message, 'bot');
+        console.error('❌ Erreur:', error);
+    }
+
+    chatInput.disabled = false;
+    sendButton.disabled = false;
+    chatInput.focus();
+}
+
+// Fonction pour envoyer une question rapide
+function sendQuickQuestion(question) {
+    if (chatInput) {
+        chatInput.value = question;
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        sendMessage();
+    }
+}
+
+// Fonction pour toggle le menu
+function toggleMenu() {
+    const menu = document.getElementById('navMenu');
+    if (menu) menu.classList.toggle('active');
+}
+
+// Fonction pour ajouter un message
+function addMessage(text, sender, source, sourceType) {
+    if (!chatMessages || !typingIndicator) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ' + sender;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.innerHTML = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
+
+    const contentWrapper = document.createElement('div');
+    
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.innerHTML = formatMessage(text);
+
+    if (source && sender === 'bot') {
+        const sourceTag = document.createElement('div');
+        sourceTag.className = 'source-badge ' + sourceType;
+        sourceTag.innerHTML = '<i class="fas fa-info-circle"></i> ' + source;
+        content.appendChild(sourceTag);
+    }
+
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    contentWrapper.appendChild(content);
+    contentWrapper.appendChild(time);
+
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentWrapper);
+
+    chatMessages.insertBefore(messageDiv, typingIndicator);
+    scrollToBottom();
+}
+
+// Fonction pour formater les messages
+function formatMessage(text) {
+    if (!text) return '';
+    
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.+?)\*/g, '<strong>$1</strong>');
+    text = text.replace(/\n/g, '<br>');
+    text = text.replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>');
+    text = text.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+    
+    if (text.includes('<li>') && !text.includes('<ul>')) {
+        text = text.replace(/(<li>.*?<\/li>)/gs, '<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">$1</ul>');
+    }
+    
+    text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
+    text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
+    text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
+    
+    return text;
+}
+
+// Fonction pour obtenir le texte de la source
+function getSourceText(method) {
+    const map = {
+        'salutation': '🤝 Accueil',
+        'json_direct': '📚 Base FAQ',
+        'groq_generated': '🤖 IA Groq',
+        'no_result': 'ℹ Info',
+        'fallback': '💡 Conseil',
+        'error_fallback': '⚠ Erreur'
+    };
+    return map[method] || '💗 ANONTCHIGAN';
+}
+
+// Fonction pour scroller vers le bas
+function scrollToBottom() {
+    if (chatMessages) {
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 100);
+    }
+}
+
+// Initialisation au chargement du DOM
+document.addEventListener('DOMContentLoaded', function() {
+    // Récupération des éléments
+    chatMessages = document.getElementById('chatMessages');
+    chatInput = document.getElementById('chatInput');
+    sendButton = document.getElementById('sendButton');
+    typingIndicator = document.getElementById('typingIndicator');
+    
+    console.log('✅ Éléments récupérés:', { chatMessages, chatInput, sendButton, typingIndicator });
+
+    // Menu navigation
+    document.querySelectorAll('.nav-menu a').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                const menu = document.getElementById('navMenu');
+                if (menu) menu.classList.remove('active');
+            }
+        });
+    });
+
+    // Chat input auto-resize
+    if (chatInput) {
+        chatInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+        
+        chatInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        chatInput.focus();
+        console.log('✅ Interface chargée et prête');
+    }
+});
+</script>
+
 <nav>
 <div class="nav-container">
 <a href="https://abel123.pythonanywhere.com/" class="logo" target="_blank">
