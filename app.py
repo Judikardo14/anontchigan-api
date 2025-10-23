@@ -564,8 +564,8 @@ with st.sidebar:
     </style>
 
     <div class="navbar">
-        <a href="https://abel123.pythonanywhere.com/accueil" class="active">Accueil</a>
-        <a href="https://abel123.pythonanywhere.com/about">À propos</a>
+        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
+        <a href="https://abel123.pythonanywhere.com/a-propos">À propos</a>
         <a href="https://abel123.pythonanywhere.com/chatbot">Chatbot</a>
         <a href="https://abel123.pythonanywhere.com/predictor">Prédiction</a>
         <a href="https://abel123.pythonanywhere.com/contact">Contact</a>
