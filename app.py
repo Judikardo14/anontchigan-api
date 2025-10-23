@@ -15,7 +15,7 @@ import sys
 # ============================================
 
 st.set_page_config(
-    page_title="ANONTCHIGAN API",
+    page_title="ANONTCHIGAN",
     page_icon="💗",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -492,7 +492,7 @@ st.markdown("""
 # Header
 st.markdown("""
 <div class="main-header">
-    <h1>💗 ANONTCHIGAN API</h1>
+    <h1>💗 ANONTCHIGAN </h1>
     <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
@@ -517,18 +517,7 @@ with st.sidebar:
             <h3>{groq_status}</h3>
             <p>Groq AI</p>
         </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Documentation API
-    st.markdown("### 🔗 Utiliser l'API")
-    
-    # Récupérer l'URL de l'app
-    try:
-        app_url = st.secrets.get("app_url", "https://votre-app.streamlit.app")
-    except:
-        app_url = "https://votre-app.streamlit.app"
+        """, unsafe_allow_html=True)   
     
     st.markdown(f"""
     <div class="api-info">
@@ -656,7 +645,7 @@ if question := st.chat_input("Posez votre question sur le cancer du sein..."):
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v2.3.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
+    <p>ANONTCHIGAN v0.1 - Développé par le Club d'IA de l'ENSGMM</p>
     <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
