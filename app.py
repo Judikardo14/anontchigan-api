@@ -548,11 +548,11 @@ with st.sidebar:
     </style>
 
     <div class="navbar">
-        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
-        <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
+        <a href="https://kloo.me/anontchigan/" class="active">Accueil</a>
+        <a href="https://kloo.me/anontchigan/a-propos/">À propos</a>
         <a href="https://anontchigan-api.streamlit.app/">Chatbot</a>
-        <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
-        <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
+        <a href="https://kloo.me/anontchigan/predictor/">Prédiction</a>
+        <a href="https://kloo.me/anontchigan/contact/">Contact</a>
     </div>
 """, unsafe_allow_html=True)
 
