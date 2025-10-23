@@ -28,43 +28,69 @@ st.set_page_config(
 hide_streamlit_style = """
 <style>
     /* Masquer le menu hamburger */
-    #MainMenu {visibility: hidden;}
+    #MainMenu {visibility: hidden !important;}
     
     /* Masquer le footer "Made with Streamlit" */
-    footer {visibility: hidden;}
+    footer {visibility: hidden !important;}
+    footer::after {content: none !important;}
     
     /* Masquer le header Streamlit */
-    header {visibility: hidden;}
+    header {visibility: hidden !important;}
     
     /* Masquer le bouton "Deploy" */
-    .stDeployButton {display: none;}
+    .stDeployButton {display: none !important;}
     
     /* Masquer le lien GitHub */
-    .viewerBadge_container__1QSob {display: none;}
+    .viewerBadge_container__1QSob {display: none !important;}
     
     /* Masquer l'icône GitHub */
-    .viewerBadge_link__1S137 {display: none;}
+    .viewerBadge_link__1S137 {display: none !important;}
     
     /* Masquer tous les badges */
-    .stApp header {display: none;}
+    .stApp header {display: none !important;}
     
     /* Style pour cacher complètement le header */
-    div[data-testid="stToolbar"] {display: none;}
+    div[data-testid="stToolbar"] {display: none !important;}
     
     /* Cacher le bouton fork */
-    button[title="View source on GitHub"] {display: none;}
+    button[title="View source on GitHub"] {display: none !important;}
     
     /* Masquer "Created by" */
-    .css-1v0mbdj {display: none;}
+    .css-1v0mbdj {display: none !important;}
     
     /* Masquer le logo Streamlit rouge en bas */
-    .css-1dp5vir {display: none;}
+    .css-1dp5vir {display: none !important;}
     
     /* Masquer toute référence à Streamlit */
-    a[href*="streamlit.io"] {display: none;}
+    a[href*="streamlit.io"] {display: none !important;}
+    a[href*="share.streamlit.io"] {display: none !important;}
     
     /* Masquer le footer complet de Streamlit */
-    footer, .reportview-container .main footer {visibility: hidden;}
+    footer, .reportview-container .main footer {visibility: hidden !important;}
+    
+    /* Masquer "Hosted with Streamlit" */
+    .styles_viewerBadge__1yB5_ {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    
+    /* Masquer le badge en haut à droite */
+    .viewerBadge_container__r5tak {display: none !important;}
+    .viewerBadge_link__qRIco {display: none !important;}
+    
+    /* Masquer tous les éléments de type badge */
+    [class*="viewerBadge"] {display: none !important;}
+    
+    /* Masquer uniquement le footer global de Streamlit, pas celui des messages */
+    .main > footer {display: none !important;}
+    .stApp > footer {display: none !important;}
+    
+    /* Masquer le badge "Hosted with Streamlit" sans toucher au contenu */
+    [data-testid="stStatusWidget"] {display: none !important;}
+    
+    /* Masquer les liens vers streamlit.io */
+    a[href*="streamlit.io"]:not(.navbar a) {
+        display: none !important;
+        visibility: hidden !important;
+    }
     
     /* Réduire l'espace en haut */
     .block-container {
@@ -227,4 +253,524 @@ Conseils de prévention : seulement si pertinents et si demandés."""
     
     def _is_valid_answer(self, answer: str) -> bool:
         return (len(answer) >= Config.MIN_ANSWER_LENGTH and 
-                not
+                not answer.lower().startswith(('je ne sais pas', 'désolé', 'sorry')))
+    
+    def _ensure_complete_response(self, answer: str) -> str:
+        if not answer:
+            return answer
+            
+        cut_indicators = [
+            answer.endswith('...'),
+            answer.endswith(','),
+            answer.endswith(';'),
+            answer.endswith(' '),
+            any(word in answer.lower() for word in ['http', 'www.', '.com']),
+            '...' in answer[-10:]
+        ]
+        
+        if any(cut_indicators):
+            logger.warning("⚠️  Détection possible de réponse coupée")
+            
+            last_period = answer.rfind('.')
+            last_exclamation = answer.rfind('!')
+            last_question = answer.rfind('?')
+            
+            sentence_end = max(last_period, last_exclamation, last_question)
+            
+            if sentence_end > 0 and sentence_end >= len(answer) - 5:
+                answer = answer[:sentence_end + 1]
+            else:
+                answer = answer.rstrip(' ,;...')
+                if not answer.endswith(('.', '!', '?')):
+                    answer += '.'
+        
+        prevention_phrases = [
+            'conseil de prévention',
+            'pour prévenir',
+            'je recommande',
+            'il est important de',
+            'n oubliez pas de'
+        ]
+        
+        has_prevention_advice = any(phrase in answer.lower() for phrase in prevention_phrases)
+        
+        if has_prevention_advice:
+            lines = answer.split('. ')
+            if len(lines) > 1:
+                for i, line in enumerate(lines[1:], 1):
+                    if any(phrase in line.lower() for phrase in prevention_phrases):
+                        lines[i] = '\n' + lines[i]
+                        answer = '. '.join(lines)
+                        break
+        
+        return answer
+
+# ============================================
+# SERVICE RAG
+# ============================================
+
+class RAGService:
+    def __init__(self, data_file: str = 'cancer_sein.json'):
+        self.questions_data = []
+        self.embedding_model = None
+        self.index = None
+        self.embeddings = None
+        self._load_data(data_file)
+        self._initialize_embeddings()
+    
+    def _load_data(self, data_file: str):
+        try:
+            with open(data_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            for item in data:
+                self.questions_data.append({
+                    'question_originale': item['question'],
+                    'question_normalisee': item['question'].lower().strip(),
+                    'answer': item['answer']
+                })
+            
+            logger.info(f"✓ {len(self.questions_data)} questions chargées")
+            
+        except Exception as e:
+            logger.error(f"Erreur chargement données: {str(e)}")
+            raise
+    
+    def _initialize_embeddings(self):
+        try:
+            os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+            os.environ['TRANSFORMERS_CACHE'] = '/tmp/transformers_cache'
+            os.environ['SENTENCE_TRANSFORMERS_HOME'] = '/tmp/sentence_transformers'
+            
+            self.embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            
+            all_texts = [
+                f"Q: {item['question_originale']} R: {item['answer']}"
+                for item in self.questions_data
+            ]
+            
+            self.embeddings = self.embedding_model.encode(all_texts, show_progress_bar=False)
+            self.embeddings = np.array(self.embeddings).astype('float32')
+            
+            dimension = self.embeddings.shape[1]
+            self.index = faiss.IndexFlatL2(dimension)
+            self.index.add(self.embeddings)
+            
+            logger.info(f"✓ Index FAISS créé ({len(self.embeddings)} vecteurs)")
+            
+        except Exception as e:
+            logger.error(f"Erreur initialisation embeddings: {str(e)}")
+            raise
+    
+    def search(self, query: str, k: int = Config.FAISS_RESULTS_COUNT) -> List[Dict]:
+        try:
+            query_embedding = self.embedding_model.encode([query])
+            query_embedding = np.array(query_embedding).astype('float32')
+            
+            distances, indices = self.index.search(query_embedding, k)
+            
+            results = []
+            for i, idx in enumerate(indices[0]):
+                if idx < len(self.questions_data):
+                    similarity = 1 / (1 + distances[0][i])
+                    results.append({
+                        'question': self.questions_data[idx]['question_originale'],
+                        'answer': self.questions_data[idx]['answer'],
+                        'similarity': similarity,
+                        'distance': distances[0][i]
+                    })
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Erreur recherche FAISS: {str(e)}")
+            return []
+
+# ============================================
+# FONCTION DE TRAITEMENT DES QUESTIONS
+# ============================================
+
+def process_question(question: str, history: List[Dict], groq_service, rag_service):
+    """Traite une question et retourne la réponse"""
+    
+    # Salutations
+    salutations = ["cc", "bonjour", "salut", "coucou", "hello", "akwe", "yo", "bonsoir", "hi"]
+    question_lower = question.lower().strip()
+    
+    if any(salut == question_lower for salut in salutations):
+        responses = [
+            "Je suis ANONTCHIGAN, assistante pour la sensibilisation au cancer du sein. Comment puis-je vous aider ? 💗",
+            "Bonjour ! Je suis ANONTCHIGAN. Que souhaitez-vous savoir sur le cancer du sein ? 🌸",
+            "ANONTCHIGAN à votre service. Posez-moi vos questions sur la prévention du cancer du sein. 😊"
+        ]
+        return {
+            "answer": random.choice(responses),
+            "method": "salutation",
+            "score": None
+        }
+    
+    # Recherche FAISS
+    logger.info("🔍 Recherche FAISS...")
+    faiss_results = rag_service.search(question)
+    
+    if not faiss_results:
+        return {
+            "answer": "Les informations disponibles ne couvrent pas ce point spécifique. Je vous recommande de consulter un professionnel de santé au Bénin pour des conseils adaptés. 💗",
+            "method": "no_result",
+            "score": None
+        }
+    
+    best_result = faiss_results[0]
+    similarity = best_result['similarity']
+    
+    logger.info(f"📊 Meilleure similarité: {similarity:.3f}")
+    
+    # Décision : Réponse directe vs Génération
+    if similarity >= Config.SIMILARITY_THRESHOLD:
+        logger.info(f"✅ Haute similarité → Réponse directe")
+        answer = best_result['answer']
+        
+        if len(answer) > Config.MAX_ANSWER_LENGTH:
+            answer = answer[:Config.MAX_ANSWER_LENGTH-3] + "..."
+        
+        return {
+            "answer": answer,
+            "method": "json_direct",
+            "score": float(similarity)
+        }
+    
+    else:
+        logger.info(f"🤖 Similarité modérée → Génération Groq")
+        
+        # Préparer le contexte
+        context_parts = []
+        for i, result in enumerate(faiss_results[:3], 1):
+            answer_truncated = result['answer']
+            if len(answer_truncated) > 200:
+                answer_truncated = answer_truncated[:197] + "..."
+            context_parts.append(f"{i}. Q: {result['question']}\n   R: {answer_truncated}")
+        
+        context = "\n\n".join(context_parts)
+        
+        # Génération avec Groq
+        try:
+            if groq_service.available:
+                answer = groq_service.generate_response(question, context, history)
+                method = "groq_generated"
+            else:
+                answer = "Je vous recommande de consulter un professionnel de santé pour cette question spécifique. La prévention précoce est essentielle. 💗"
+                method = "fallback"
+        except Exception as e:
+            logger.warning(f"Génération échouée: {str(e)}")
+            answer = "Pour des informations précises sur ce sujet, veuillez consulter un médecin ou un centre de santé spécialisé au Bénin. 🌸"
+            method = "error_fallback"
+        
+        return {
+            "answer": answer,
+            "method": method,
+            "score": float(similarity)
+        }
+
+# ============================================
+# INITIALISATION DES SERVICES (CACHE)
+# ============================================
+
+@st.cache_resource
+def load_services():
+    """Charge les services une seule fois"""
+    logger.info("🚀 Chargement des services...")
+    groq = GroqService()
+    rag = RAGService()
+    logger.info("✓ Services chargés")
+    return groq, rag
+
+groq_service, rag_service = load_services()
+
+# ============================================
+# GESTION DES PARAMÈTRES URL
+# ============================================
+
+# Vérifier si c'est un appel API via les query params
+query_params = st.query_params
+
+if "api" in query_params and query_params["api"] == "true":
+    # MODE API - Pas d'interface, juste réponse JSON
+    if "question" in query_params:
+        question = query_params["question"]
+        user_id = query_params.get("user_id", f"user_{random.randint(1000, 9999)}")
+        
+        try:
+            result = process_question(question, [], groq_service, rag_service)
+            
+            response_data = {
+                "success": True,
+                "answer": result["answer"],
+                "method": result["method"],
+                "similarity_score": result["score"],
+                "user_id": user_id
+            }
+            
+            st.json(response_data)
+            st.stop()
+            
+        except Exception as e:
+            error_data = {
+                "success": False,
+                "error": str(e),
+                "user_id": user_id
+            }
+            st.json(error_data)
+            st.stop()
+    else:
+        st.json({
+            "success": False,
+            "error": "Paramètre 'question' manquant"
+        })
+        st.stop()
+
+# ============================================
+# INTERFACE STREAMLIT NORMALE
+# ============================================
+
+# CSS personnalisé
+st.markdown("""
+<style>
+    .main-header {
+        text-align: center;
+        padding: 0.5rem 1rem;
+        background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+        color: white;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    .main-header h1 {
+        font-size: 1.8rem;
+        margin: 0.3rem 0;
+    }
+    .main-header p {
+        font-size: 0.95rem;
+        margin: 0.2rem 0;
+    }
+    .stat-box {
+        background: #f0f2f6;
+        padding: 1rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .api-info {
+        background: #e8f4f8;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #0066cc;
+        margin-bottom: 1rem;
+    }
+    .api-code {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 0.85em;
+        overflow-x: auto;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Barre de navigation
+st.markdown("""
+<style>
+/* --- Barre de navigation blanche --- */
+.navbar {
+    background-color: #ffffff;
+    overflow: hidden;
+    border-radius: 10px;
+    padding: 10px 0;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+}
+
+/* --- Liens (boutons) --- */
+.navbar a {
+    display: inline-block;
+    background-color: #ffb6c1; /* rose clair */
+    color: #ffffff; /* texte blanc */
+    text-align: center;
+    padding: 10px 18px;
+    margin: 4px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 17px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+/* --- Effet hover (survol) --- */
+.navbar a:hover {
+    background-color: #ff1493; /* rose vif au survol */
+    transform: scale(1.05);
+    color: white;
+    font-weight: bold;
+}
+
+/* --- Bouton actif (page actuelle) --- */
+.navbar a.active {
+    background-color: #ff1493; /* rose profond */
+    color: white;
+    font-weight: bold;
+}
+</style>
+
+<div class="navbar">
+    <a href="https://abel123.pythonanywhere.com/">Accueil</a>
+    <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
+    <a href="https://anontchigan-api.streamlit.app/" class="active">Chatbot</a>
+    <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
+    <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
+</div>
+""", unsafe_allow_html=True)
+
+# Header
+st.markdown("""
+<div class="main-header">
+    <h1>💗 ANONTCHIGAN </h1>
+    <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Sidebar
+with st.sidebar:
+    # Barre de navigation dans la sidebar
+    st.markdown("""
+    <style>
+    /* --- Barre de navigation blanche --- */
+    .navbar {
+        background-color: #ffffff;
+        overflow: hidden;
+        border-radius: 10px;
+        padding: 10px 0;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    /* --- Liens (boutons) --- */
+    .navbar a {
+        display: inline-block;
+        background-color: #ffb6c1; /* rose clair */
+        color: #ffffff; /* texte blanc */
+        text-align: center;
+        padding: 10px 18px;
+        margin: 4px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 17px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    /* --- Effet hover (survol) --- */
+    .navbar a:hover {
+        background-color: #ff1493; /* rose vif au survol */
+        transform: scale(1.05);
+        color: white;
+        font-weight: bold;
+    }
+
+    /* --- Bouton actif (page actuelle) --- */
+    .navbar a.active {
+        background-color: #ff1493; /* rose profond */
+        color: white;
+        font-weight: bold;
+    }
+    </style>
+
+    <div class="navbar">
+        <a href="https://abel123.pythonanywhere.com/">Accueil</a>
+        <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
+        <a href="https://anontchigan-api.streamlit.app/" class="active">Chatbot</a>
+        <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
+        <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    
+    st.markdown("""
+    ### Développé par:
+    - Judicaël Karol DOBOEVI
+    - Ursus Hornel GBAGUIDI
+    - Abel Kokou KPOCOUTA
+    - Josaphat ADJELE
+    
+    **Club d'IA - ENSGMM Abomey**
+    """)
+    
+    if st.button("🔄 Réinitialiser la conversation"):
+        st.session_state.messages = []
+        st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
+        st.session_state.conversation_history = []
+        st.rerun()
+
+# Initialisation de la session
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "user_id" not in st.session_state:
+    st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
+
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
+# Afficher l'historique des messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Input utilisateur
+if question := st.chat_input("Posez votre question sur le cancer du sein..."):
+    # Ajouter la question de l'utilisateur
+    st.session_state.messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.markdown(question)
+    
+    # Traiter la question
+    with st.chat_message("assistant"):
+        with st.spinner("Je réfléchis..."):
+            try:
+                result = process_question(
+                    question, 
+                    st.session_state.conversation_history,
+                    groq_service,
+                    rag_service
+                )
+                
+                answer = result["answer"]
+                method = result["method"]
+                score = result["score"]
+                
+                # Afficher la réponse
+                st.markdown(answer)
+                
+                # Ajouter à l'historique
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                
+                # Mettre à jour l'historique de conversation
+                st.session_state.conversation_history.append({"role": "user", "content": question})
+                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
+                
+                # Limiter l'historique
+                if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
+                    st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
+                
+            except Exception as e:
+                error_message = f"❌ Erreur: {str(e)}"
+                st.error(error_message)
+                logger.error(error_message)
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #888;">
+    <p>ANONTCHIGAN v0.0.1 - Développé par le Club d'IA de l'ENSGMM</p>
+    <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+</div>
+""", unsafe_allow_html=True)
