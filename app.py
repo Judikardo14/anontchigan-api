@@ -608,7 +608,7 @@ nav {
 <li><a href="https://abel123.pythonanywhere.com/" target="_blank">Accueil</a></li>
 <li><a href="https://abel123.pythonanywhere.com/a-propos/" target="_blank">À Propos</a></li>
 <li><a href="#" class="active">Chatbot</a></li>
-<li><a href="https://abel123.pythonanywhere.com/prediction/" target="_blank">Prédiction</a></li>
+<li><a href="https://abel123.pythonanywhere.com/predictor/" target="_blank">Prédiction</a></li>
 <li><a href="https://abel123.pythonanywhere.com/contact/" target="_blank">Contact</a></li>
 </ul>
 </div>
