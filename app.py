@@ -537,8 +537,6 @@ def afficher_navbar():
     </div>
 """, unsafe_allow_html=True)
 # Header
-afficher_navbar()
-st.markdown("---")
 st.markdown("""
 <div class="main-header">
     <h1>💗 ANONTCHIGAN </h1>
