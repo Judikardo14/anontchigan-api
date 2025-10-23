@@ -9,6 +9,7 @@ import faiss
 import streamlit as st
 from streamlit.web import cli as stcli
 import sys
+import time
 
 # ============================================
 # CONFIGURATION
@@ -471,6 +472,24 @@ def process_question(question: str, history: List[Dict], groq_service, rag_servi
         }
 
 # ============================================
+# FONCTION POUR AFFICHER LE TEXTE PROGRESSIVEMENT
+# ============================================
+
+def stream_text(text: str, placeholder):
+    """Affiche le texte progressivement pour simuler l'écriture"""
+    words = text.split()
+    displayed_text = ""
+    
+    for i, word in enumerate(words):
+        displayed_text += word + " "
+        placeholder.markdown(displayed_text + "▌")
+        time.sleep(0.05)  # Ajustez cette valeur pour la vitesse (0.05 = 50ms par mot)
+    
+    # Affichage final sans le curseur
+    placeholder.markdown(text)
+    return text
+
+# ============================================
 # INITIALISATION DES SERVICES (CACHE)
 # ============================================
 
@@ -638,8 +657,6 @@ st.markdown("""
 
 # Sidebar
 with st.sidebar:
-    
-
     st.markdown("---")
     
     st.markdown("""
@@ -668,13 +685,24 @@ if "user_id" not in st.session_state:
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
-# Afficher l'historique des messages
-for message in st.session_state.messages:
+# Afficher l'historique des messages (SANS LE DERNIER MESSAGE SI EN TRAITEMENT)
+if "processing" not in st.session_state:
+    st.session_state.processing = False
+
+messages_to_display = st.session_state.messages
+if st.session_state.processing and len(messages_to_display) > 0:
+    # Ne pas afficher le dernier message assistant si on est en train de traiter
+    messages_to_display = messages_to_display[:-1] if messages_to_display[-1]["role"] == "assistant" else messages_to_display
+
+for message in messages_to_display:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
 # Input utilisateur
 if question := st.chat_input("Posez votre question sur le cancer du sein..."):
+    # Marquer qu'on est en train de traiter
+    st.session_state.processing = True
+    
     # Ajouter la question de l'utilisateur
     st.session_state.messages.append({"role": "user", "content": question})
     with st.chat_message("user"):
@@ -682,37 +710,43 @@ if question := st.chat_input("Posez votre question sur le cancer du sein..."):
     
     # Traiter la question
     with st.chat_message("assistant"):
-        with st.spinner("Je réfléchis..."):
-            try:
-                result = process_question(
-                    question, 
-                    st.session_state.conversation_history,
-                    groq_service,
-                    rag_service
-                )
-                
-                answer = result["answer"]
-                method = result["method"]
-                score = result["score"]
-                
-                # Afficher la réponse
-                st.markdown(answer)
-                
-                # Ajouter à l'historique
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-                
-                # Mettre à jour l'historique de conversation
-                st.session_state.conversation_history.append({"role": "user", "content": question})
-                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
-                
-                # Limiter l'historique
-                if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
-                    st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
-                
-            except Exception as e:
-                error_message = f"❌ Erreur: {str(e)}"
-                st.error(error_message)
-                logger.error(error_message)
+        # Créer un placeholder pour l'effet de streaming
+        message_placeholder = st.empty()
+        
+        try:
+            result = process_question(
+                question, 
+                st.session_state.conversation_history,
+                groq_service,
+                rag_service
+            )
+            
+            answer = result["answer"]
+            method = result["method"]
+            score = result["score"]
+            
+            # Afficher la réponse avec effet de streaming
+            final_answer = stream_text(answer, message_placeholder)
+            
+            # Ajouter à l'historique
+            st.session_state.messages.append({"role": "assistant", "content": final_answer})
+            
+            # Mettre à jour l'historique de conversation
+            st.session_state.conversation_history.append({"role": "user", "content": question})
+            st.session_state.conversation_history.append({"role": "assistant", "content": final_answer})
+            
+            # Limiter l'historique
+            if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
+                st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
+            
+        except Exception as e:
+            error_message = f"❌ Erreur: {str(e)}"
+            message_placeholder.error(error_message)
+            logger.error(error_message)
+        
+        finally:
+            # Marquer que le traitement est terminé
+            st.session_state.processing = False
 
 # Footer
 st.markdown("---")
