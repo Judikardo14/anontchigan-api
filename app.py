@@ -522,7 +522,7 @@ with st.sidebar:
     except:
         app_url = "https://anontchigan-api.streamlit.app"
 
-st.markdown("""
+    st.markdown("""
     <style>
     /* Barre de navigation */
     .navbar {
