@@ -28,43 +28,56 @@ st.set_page_config(
 hide_streamlit_style = """
 <style>
     /* Masquer le menu hamburger */
-    #MainMenu {visibility: hidden;}
+    #MainMenu {visibility: hidden !important;}
     
     /* Masquer le footer "Made with Streamlit" */
-    footer {visibility: hidden;}
+    footer {visibility: hidden !important;}
+    footer::after {content: none !important;}
     
     /* Masquer le header Streamlit */
-    header {visibility: hidden;}
+    header {visibility: hidden !important;}
     
     /* Masquer le bouton "Deploy" */
-    .stDeployButton {display: none;}
+    .stDeployButton {display: none !important;}
     
     /* Masquer le lien GitHub */
-    .viewerBadge_container__1QSob {display: none;}
+    .viewerBadge_container__1QSob {display: none !important;}
     
     /* Masquer l'icône GitHub */
-    .viewerBadge_link__1S137 {display: none;}
+    .viewerBadge_link__1S137 {display: none !important;}
     
     /* Masquer tous les badges */
-    .stApp header {display: none;}
+    .stApp header {display: none !important;}
     
     /* Style pour cacher complètement le header */
-    div[data-testid="stToolbar"] {display: none;}
+    div[data-testid="stToolbar"] {display: none !important;}
     
     /* Cacher le bouton fork */
-    button[title="View source on GitHub"] {display: none;}
+    button[title="View source on GitHub"] {display: none !important;}
     
     /* Masquer "Created by" */
-    .css-1v0mbdj {display: none;}
+    .css-1v0mbdj {display: none !important;}
     
     /* Masquer le logo Streamlit rouge en bas */
-    .css-1dp5vir {display: none;}
+    .css-1dp5vir {display: none !important;}
     
     /* Masquer toute référence à Streamlit */
-    a[href*="streamlit.io"] {display: none;}
+    a[href*="streamlit.io"] {display: none !important;}
+    a[href*="share.streamlit.io"] {display: none !important;}
     
     /* Masquer le footer complet de Streamlit */
-    footer, .reportview-container .main footer {visibility: hidden;}
+    footer, .reportview-container .main footer {visibility: hidden !important;}
+    
+    /* Masquer "Hosted with Streamlit" */
+    .styles_viewerBadge__1yB5_ {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    
+    /* Masquer le badge en haut à droite */
+    .viewerBadge_container__r5tak {display: none !important;}
+    .viewerBadge_link__qRIco {display: none !important;}
+    
+    /* Masquer tous les éléments de type badge */
+    [class*="viewerBadge"] {display: none !important;}
     
     /* Réduire l'espace en haut */
     .block-container {
@@ -511,11 +524,19 @@ st.markdown("""
 <style>
     .main-header {
         text-align: center;
-        padding: 1rem;
+        padding: 0.5rem 1rem;
         background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
         color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    .main-header h1 {
+        font-size: 1.8rem;
+        margin: 0.3rem 0;
+    }
+    .main-header p {
+        font-size: 0.95rem;
+        margin: 0.2rem 0;
     }
     .stat-box {
         background: #f0f2f6;
