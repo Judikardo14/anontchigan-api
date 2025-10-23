@@ -21,9 +21,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ANONTCHIGAN")
-
 # ============================================
 # MASQUAGE DES ÉLÉMENTS STREAMLIT
 # ============================================
@@ -36,7 +33,7 @@ hide_streamlit_style = """
     /* Masquer le footer "Made with Streamlit" */
     footer {visibility: hidden;}
     
-    /* Masquer le header */
+    /* Masquer le header Streamlit */
     header {visibility: hidden;}
     
     /* Masquer le bouton "Deploy" */
@@ -56,10 +53,31 @@ hide_streamlit_style = """
     
     /* Cacher le bouton fork */
     button[title="View source on GitHub"] {display: none;}
+    
+    /* Masquer "Created by" */
+    .css-1v0mbdj {display: none;}
+    
+    /* Masquer le logo Streamlit rouge en bas */
+    .css-1dp5vir {display: none;}
+    
+    /* Masquer toute référence à Streamlit */
+    a[href*="streamlit.io"] {display: none;}
+    
+    /* Masquer le footer complet de Streamlit */
+    footer, .reportview-container .main footer {visibility: hidden;}
+    
+    /* Réduire l'espace en haut */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0rem;
+    }
 </style>
 """
 
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ANONTCHIGAN")
 
 class Config:
     """Configuration optimisée"""
@@ -522,58 +540,61 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-def afficher_navbar():
-    st.markdown("""
-    <style>
-    /* --- Barre de navigation blanche --- */
-    .navbar {
-        background-color: #ffffff;
-        overflow: hidden;
-        border-radius: 10px;
-        padding: 10px 0;
-        text-align: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
 
-    /* --- Liens (boutons) --- */
-    .navbar a {
-        display: inline-block;
-        background-color: #ffb6c1; /* rose clair */
-        color: #ffffff; /* texte blanc */
-        text-align: center;
-        padding: 10px 18px;
-        margin: 4px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-size: 17px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
+# Barre de navigation
+st.markdown("""
+<style>
+/* --- Barre de navigation blanche --- */
+.navbar {
+    background-color: #ffffff;
+    overflow: hidden;
+    border-radius: 10px;
+    padding: 10px 0;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+}
 
-    /* --- Effet hover (survol) --- */
-    .navbar a:hover {
-        background-color: #ff1493; /* rose vif au survol */
-        transform: scale(1.05);
-        color: white;
-        font-weight: bold;
-    }
+/* --- Liens (boutons) --- */
+.navbar a {
+    display: inline-block;
+    background-color: #ffb6c1; /* rose clair */
+    color: #ffffff; /* texte blanc */
+    text-align: center;
+    padding: 10px 18px;
+    margin: 4px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 17px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
 
-    /* --- Bouton actif (page actuelle) --- */
-    .navbar a.active {
-        background-color: #ff1493; /* rose profond */
-        color: white;
-        font-weight: bold;
-    }
-    </style>
+/* --- Effet hover (survol) --- */
+.navbar a:hover {
+    background-color: #ff1493; /* rose vif au survol */
+    transform: scale(1.05);
+    color: white;
+    font-weight: bold;
+}
 
-    <div class="navbar">
-        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
-        <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
-        <a href="https://anontchigan-api.streamlit.app/">Chatbot</a>
-        <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
-        <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
-    </div>
+/* --- Bouton actif (page actuelle) --- */
+.navbar a.active {
+    background-color: #ff1493; /* rose profond */
+    color: white;
+    font-weight: bold;
+}
+</style>
+
+<div class="navbar">
+    <a href="https://abel123.pythonanywhere.com/">Accueil</a>
+    <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
+    <a href="https://anontchigan-api.streamlit.app/" class="active">Chatbot</a>
+    <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
+    <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
+</div>
 """, unsafe_allow_html=True)
+
 # Header
 st.markdown("""
 <div class="main-header">
@@ -584,15 +605,7 @@ st.markdown("""
 
 # Sidebar
 with st.sidebar:
-    # Documentation API
-    #st.markdown("### 🔗 Utiliser l'API")
-    
-    # Récupérer l'URL de l'app
-    try:
-        app_url = st.secrets.get("app_url", "https://anontchigan-api.streamlit.app")
-    except:
-        app_url = "https://anontchigan-api.streamlit.app"
-
+    # Barre de navigation dans la sidebar
     st.markdown("""
     <style>
     /* --- Barre de navigation blanche --- */
@@ -637,13 +650,13 @@ with st.sidebar:
     </style>
 
     <div class="navbar">
-        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
+        <a href="https://abel123.pythonanywhere.com/">Accueil</a>
         <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
-        <a href="https://anontchigan-api.streamlit.app/">Chatbot</a>
+        <a href="https://anontchigan-api.streamlit.app/" class="active">Chatbot</a>
         <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
         <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
     
@@ -702,13 +715,6 @@ if question := st.chat_input("Posez votre question sur le cancer du sein..."):
                 
                 # Afficher la réponse
                 st.markdown(answer)
-                
-                # Afficher les métadonnées (optionnel)
-                #with st.expander("ℹ️ Détails de la réponse"):
-                    #st.write(f"**Méthode:** {method}")
-                    #if score is not None:
-                        #st.write(f"**Score de similarité:** {score:.3f}")
-                    #st.write(f"**User ID:** {st.session_state.user_id}")
                 
                 # Ajouter à l'historique
                 st.session_state.messages.append({"role": "assistant", "content": answer})
