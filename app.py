@@ -538,10 +538,10 @@ def afficher_navbar():
 """, unsafe_allow_html=True)
 # Header
 afficher_navbar()
+st.markdown("---")
 st.markdown("""
 <div class="main-header">
-    <h1>💗 ANONTCHIGAN </h1>
-    <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+    <h1>💗 ANONTCHIGAN Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯 </h1>
 </div>
 """, unsafe_allow_html=True)
 
