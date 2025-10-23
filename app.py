@@ -7,18 +7,17 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 import streamlit as st
-from streamlit.web import cli as stcli
-import sys
+import streamlit.components.v1 as components
 
 # ============================================
 # CONFIGURATION
 # ============================================
 
 st.set_page_config(
-    page_title="ANONTCHIGAN API",
-    page_icon="💗",
+    page_title="ANONTCHIGAN",
+    page_icon="💗🎗️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -409,10 +408,9 @@ def load_services():
 groq_service, rag_service = load_services()
 
 # ============================================
-# GESTION DES PARAMÈTRES URL
+# GESTION DES PARAMÈTRES URL (MODE API)
 # ============================================
 
-# Vérifier si c'est un appel API via les query params
 query_params = st.query_params
 
 if "api" in query_params and query_params["api"] == "true":
@@ -451,93 +449,589 @@ if "api" in query_params and query_params["api"] == "true":
         st.stop()
 
 # ============================================
-# INTERFACE STREAMLIT NORMALE
+# INTERFACE HTML PERSONNALISÉE
 # ============================================
 
-# CSS personnalisé
-st.markdown("""
+html_content = """<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <style>
-    .main-header {
-        text-align: center;
-        padding: 1rem;
-        background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --rose-primary: #E91E63;
+    --rose-dark: #C2185B;
+    --violet: #9C27B0;
+    --blanc: #FFFFFF;
+    --gris: #424242;
+}
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #fff;
+    color: var(--gris);
+}
+nav {
+    background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+    padding: 1rem 0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-decoration: none;
+}
+.logo i { font-size: 2rem; }
+.nav-menu {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+}
+.nav-menu a {
+    color: #fff;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+.nav-menu a:hover, .nav-menu a.active {
+    background: rgba(255,255,255,0.2);
+    transform: translateY(-2px);
+}
+.menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+.chat-container {
+    max-width: 1000px;
+    margin: 1rem auto;
+    height: calc(100vh - 180px);
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+.chat-header {
+    background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+    color: #fff;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.chat-header-avatar {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    background: linear-gradient(to bottom, #f8f9fa, #fff);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.message {
+    display: flex;
+    gap: 1rem;
+    animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+.message.bot .message-avatar {
+    background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+    color: #fff;
+}
+.message.user {
+    flex-direction: row-reverse;
+}
+.message.user .message-avatar {
+    background: #f5f5f5;
+    color: var(--gris);
+}
+.message-content {
+    max-width: 75%;
+    padding: 1rem 1.5rem;
+    border-radius: 20px;
+    line-height: 1.6;
+}
+.message.bot .message-content {
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-bottom-left-radius: 5px;
+}
+.message.user .message-content {
+    background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+    color: #fff;
+    border-bottom-right-radius: 5px;
+}
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: 0.3rem;
+}
+.typing-indicator {
+    display: none;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+}
+.typing-indicator.active { display: flex; }
+.typing-dots {
+    display: flex;
+    gap: 0.3rem;
+    padding: 1rem 1.5rem;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    background: var(--rose-primary);
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.7; }
+    30% { transform: translateY(-10px); opacity: 1; }
+}
+.chat-input-container {
+    padding: 1.5rem;
+    background: #fff;
+    border-top: 1px solid #e0e0e0;
+}
+.chat-input-wrapper {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+}
+.chat-input {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: none;
+    max-height: 120px;
+    min-height: 50px;
+}
+.chat-input:focus {
+    outline: none;
+    border-color: var(--rose-primary);
+    box-shadow: 0 0 0 3px rgba(233,30,99,0.1);
+}
+.send-button {
+    width: 50px;
+    height: 50px;
+    border: none;
+    background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+    color: #fff;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.send-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(233,30,99,0.4);
+}
+.send-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.quick-questions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.quick-question-btn {
+    padding: 0.5rem 1rem;
+    background: #fff;
+    border: 2px solid var(--rose-primary);
+    color: var(--rose-primary);
+    border-radius: 20px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.quick-question-btn:hover {
+    background: var(--rose-primary);
+    color: #fff;
+    transform: translateY(-2px);
+}
+.welcome-message {
+    text-align: center;
+    padding: 2rem;
+}
+.welcome-message i {
+    font-size: 4rem;
+    color: var(--rose-primary);
+    margin-bottom: 1rem;
+}
+.disclaimer {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    margin: 1rem 0;
+    border-left: 4px solid #f57c00;
+}
+.source-badge {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-top: 0.5rem;
+    padding: 0.3rem 0.6rem;
+    background: #f5f5f5;
+    border-radius: 12px;
+    display: inline-block;
+}
+.source-badge.json_direct { background: #e8f5e8; color: #2e7d32; }
+.source-badge.groq_generated { background: #e3f2fd; color: #1565c0; }
+.source-badge.salutation { background: #f3e5f5; color: #7b1fa2; }
+@media (max-width: 768px) {
+    .nav-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, var(--rose-primary), var(--violet));
+        flex-direction: column;
+        padding: 0.5rem 0;
+        gap: 0;
+        display: none;
+        z-index: 999;
     }
-    .stat-box {
-        background: #f0f2f6;
-        padding: 1rem;
-        border-radius: 8px;
-        text-align: center;
-    }
-    .api-info {
-        background: #e8f4f8;
-        padding: 1rem;
-        border-radius: 8px;
-        border-left: 4px solid #0066cc;
-        margin-bottom: 1rem;
-    }
-    .api-code {
-        background: #f5f5f5;
-        padding: 10px;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 0.85em;
-        overflow-x: auto;
-    }
+    .nav-menu.active { display: flex; }
+    .nav-menu a { padding: 0.8rem 1.5rem; width: 100%; }
+    .menu-toggle { display: block; }
+    .chat-container { margin: 0; height: calc(100vh - 120px); border-radius: 0; }
+    .message-content { max-width: 85%; }
+}
 </style>
-""", unsafe_allow_html=True)
+</head>
+<body>
 
-# Header
-st.markdown("""
-<div class="main-header">
-    <h1>💗 ANONTCHIGAN API</h1>
-    <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
+<nav>
+<div class="nav-container">
+<a href="https://abel123.pythonanywhere.com/" class="logo" target="_blank">
+<i class="fas fa-ribbon"></i>
+<span>ANONTCHIGAN</span>
+</a>
+<button class="menu-toggle" onclick="toggleMenu()">
+<i class="fas fa-bars"></i>
+</button>
+<ul class="nav-menu" id="navMenu">
+<li><a href="https://abel123.pythonanywhere.com/contact/" target="_blank">Contact</a></li>
+</ul>
 </div>
-""", unsafe_allow_html=True)
+</nav>
 
-# Sidebar
-with st.sidebar:
-    st.header("ℹ️ Informations")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{len(rag_service.questions_data)}</h3>
-            <p>Questions</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        groq_status = "✅ Activé" if groq_service.available else "❌ Désactivé"
-        st.markdown(f"""
-        <div class="stat-box">
-            <h3>{groq_status}</h3>
-            <p>Groq AI</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    st.markdown("""
-    ### 👥 Créateurs
-    - Judicaël Karol DOBOEVI
-    - Ursus Hornel GBAGUIDI
-    - Abel Kokou KPOCOUTA
-    - Josaphat ADJELE
-    
-    **Club d'IA - ENSGMM Abomey**
-    """)
-    
-    if st.button("🔄 Réinitialiser la conversation"):
-        st.session_state.messages = []
-        st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
-        st.session_state.conversation_history = []
-        st.rerun()
+<div class="chat-container">
+<div class="chat-header">
+<div class="chat-header-avatar"><i class="fas fa-robot"></i></div>
+<div class="chat-header-info">
+<h2>Assistant ANONTCHIGAN</h2>
+<p><i class="fas fa-circle" style="color: #4caf50; font-size: 0.6rem;"></i> En ligne</p>
+</div>
+</div>
 
-# Initialisation de la session
+<div class="chat-messages" id="chatMessages">
+<div class="welcome-message">
+<i class="fas fa-ribbon"></i>
+<h3 style="color: var(--rose-dark); margin-bottom: 0.5rem;">Bienvenue sur ANONTCHIGAN</h3>
+<p>Je suis votre assistant virtuel pour le cancer du sein.</p>
+</div>
+
+<div class="message bot">
+<div class="message-avatar"><i class="fas fa-robot"></i></div>
+<div>
+<div class="message-content">
+<p>Bonjour ! 👋 Je suis l'assistant ANONTCHIGAN.</p>
+<p style="margin-top: 0.5rem;">Je peux vous aider avec :</p>
+<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">
+<li>La prévention du cancer du sein</li>
+<li>Les symptômes à surveiller</li>
+<li>L'auto-examen des seins</li>
+<li>Les ressources disponibles</li>
+</ul>
+<div class="disclaimer" style="margin-top: 1rem;">
+<i class="fas fa-info-circle"></i>
+<strong>Important :</strong> Consultez toujours un médecin pour un diagnostic.
+</div>
+</div>
+<div class="message-time">Maintenant</div>
+</div>
+</div>
+
+<div style="padding: 0 1rem;">
+<p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Questions fréquentes :</p>
+<div class="quick-questions">
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les symptômes du cancer du sein ?')">Symptômes</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Comment faire l\\'auto-examen des seins ?')">Auto-examen</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les facteurs de risque ?')">Facteurs de risque</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('À partir de quel âge faire un dépistage ?')">Âge de dépistage</button>
+</div>
+</div>
+
+<div class="typing-indicator" id="typingIndicator">
+<div class="message-avatar" style="background: linear-gradient(135deg, var(--rose-primary), var(--violet)); color: #fff;">
+<i class="fas fa-robot"></i>
+</div>
+<div class="typing-dots">
+<span></span>
+<span></span>
+<span></span>
+</div>
+</div>
+</div>
+
+<div class="chat-input-container">
+<div class="chat-input-wrapper">
+<textarea id="chatInput" class="chat-input" placeholder="Posez votre question ici..." rows="1"></textarea>
+<button class="send-button" id="sendButton" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+</div>
+</div>
+</div>
+
+<script>
+// Variables globales
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendButton = document.getElementById('sendButton');
+const typingIndicator = document.getElementById('typingIndicator');
+
+// Fonction pour envoyer un message
+async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    addMessage(message, 'user');
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    chatInput.disabled = true;
+    sendButton.disabled = true;
+    typingIndicator.classList.add('active');
+    scrollToBottom();
+
+    try {
+        const apiUrl = window.location.origin + window.location.pathname + '?api=true&question=' + encodeURIComponent(message);
+        
+        console.log('🔍 Envoi à:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        console.log('✅ Réponse:', data);
+
+        typingIndicator.classList.remove('active');
+
+        if (data.success && data.answer) {
+            const sourceText = getSourceText(data.method);
+            addMessage(data.answer, 'bot', sourceText, data.method);
+        } else {
+            addMessage("❌ Erreur: " + (data.error || 'Réponse invalide'), 'bot');
+        }
+
+    } catch (error) {
+        typingIndicator.classList.remove('active');
+        addMessage("❌ Erreur de connexion: " + error.message, 'bot');
+        console.error('❌ Erreur:', error);
+    }
+
+    chatInput.disabled = false;
+    sendButton.disabled = false;
+    chatInput.focus();
+}
+
+// Fonction pour envoyer une question rapide
+function sendQuickQuestion(question) {
+    if (chatInput) {
+        chatInput.value = question;
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+        sendMessage();
+    }
+}
+
+// Fonction pour ajouter un message
+function addMessage(text, sender, source, sourceType) {
+    if (!chatMessages || !typingIndicator) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message ' + sender;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'message-avatar';
+    avatar.innerHTML = sender === 'bot' ? '<i class="fas fa-robot"></i>' : '<i class="fas fa-user"></i>';
+
+    const contentWrapper = document.createElement('div');
+    
+    const content = document.createElement('div');
+    content.className = 'message-content';
+    content.innerHTML = formatMessage(text);
+
+    if (source && sender === 'bot') {
+        const sourceTag = document.createElement('div');
+        sourceTag.className = 'source-badge ' + sourceType;
+        sourceTag.innerHTML = '<i class="fas fa-info-circle"></i> ' + source;
+        content.appendChild(sourceTag);
+    }
+
+    const time = document.createElement('div');
+    time.className = 'message-time';
+    time.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    contentWrapper.appendChild(content);
+    contentWrapper.appendChild(time);
+
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentWrapper);
+
+    chatMessages.insertBefore(messageDiv, typingIndicator);
+    scrollToBottom();
+}
+
+// Fonction pour formater les messages
+function formatMessage(text) {
+    if (!text) return '';
+    
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.+?)\*/g, '<strong>$1</strong>');
+    text = text.replace(/\n/g, '<br>');
+    text = text.replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>');
+    text = text.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
+    
+    if (text.includes('<li>') && !text.includes('<ul>')) {
+        text = text.replace(/(<li>.*?<\/li>)/gs, '<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">$1</ul>');
+    }
+    
+    text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
+    text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
+    text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
+    
+    return text;
+}
+
+// Fonction pour obtenir le texte de la source
+function getSourceText(method) {
+    const map = {
+        'salutation': '🤝 Accueil',
+        'json_direct': '📚 Base FAQ',
+        'groq_generated': '🤖 IA Groq',
+        'no_result': 'ℹ Info',
+        'fallback': '💡 Conseil',
+        'error_fallback': '⚠ Erreur'
+    };
+    return map[method] || '💗 ANONTCHIGAN';
+}
+
+// Fonction pour scroller vers le bas
+function scrollToBottom() {
+    if (chatMessages) {
+        setTimeout(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 100);
+    }
+}
+
+// Fonction pour toggle le menu
+function toggleMenu() {
+    const menu = document.getElementById('navMenu');
+    if (menu) menu.classList.toggle('active');
+}
+
+// Event listeners
+document.querySelectorAll('.nav-menu a').forEach(link => {
+    link.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+            const menu = document.getElementById('navMenu');
+            if (menu) menu.classList.remove('active');
+        }
+    });
+});
+
+if (chatInput) {
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+    
+    chatInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+}
+
+window.addEventListener('load', () => {
+    if (chatInput) {
+        chatInput.focus();
+        console.log('✅ Interface chargée et prête');
+    }
+});
+</script>
+</body>
+</html>
+"""
+
+components.html(html_content, height=800, scrolling=False)
+
+# ============================================
+# INITIALISATION SESSION STATE
+# ============================================
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -545,66 +1039,8 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
 
 if "conversation_history" not in st.session_state:
-    st.session_state.conversation_history = []
-
-# Afficher l'historique des messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Input utilisateur
-if question := st.chat_input("Posez votre question sur le cancer du sein..."):
-    # Ajouter la question de l'utilisateur
-    st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
-    
-    # Traiter la question
-    with st.chat_message("assistant"):
-        with st.spinner("Je réfléchis..."):
-            try:
-                result = process_question(
-                    question, 
-                    st.session_state.conversation_history,
-                    groq_service,
-                    rag_service
-                )
-                
-                answer = result["answer"]
-                method = result["method"]
-                score = result["score"]
-                
-                # Afficher la réponse
-                st.markdown(answer)
-                
-                # Afficher les métadonnées (optionnel)
-                with st.expander("ℹ️ Détails de la réponse"):
-                    st.write(f"**Méthode:** {method}")
-                    if score is not None:
-                        st.write(f"**Score de similarité:** {score:.3f}")
-                    st.write(f"**User ID:** {st.session_state.user_id}")
-                
-                # Ajouter à l'historique
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-                
-                # Mettre à jour l'historique de conversation
-                st.session_state.conversation_history.append({"role": "user", "content": question})
-                st.session_state.conversation_history.append({"role": "assistant", "content": answer})
-                
-                # Limiter l'historique
-                if len(st.session_state.conversation_history) > Config.MAX_HISTORY_LENGTH * 2:
-                    st.session_state.conversation_history = st.session_state.conversation_history[-Config.MAX_HISTORY_LENGTH * 2:]
-                
-            except Exception as e:
-                error_message = f"❌ Erreur: {str(e)}"
-                st.error(error_message)
-                logger.error(error_message)
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; color: #888;">
-    <p>ANONTCHIGAN v2.3.0 - Développé avec ❤️ par le Club d'IA de l'ENSGMM</p>
-    <p>Pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
-</div>
-""", unsafe_allow_html=True)
+    st.session_state.conversation_history = [].com/" target="_blank">Accueil</a></li>
+<li><a href="https://abel123.pythonanywhere.com/a-propos/" target="_blank">À Propos</a></li>
+<li><a href="#" class="active">Chatbot</a></li>
+<li><a href="https://abel123.pythonanywhere.com/predictor/" target="_blank">Prédiction</a></li>
+<li><a href="https://abel123.pythonanywhere
