@@ -524,44 +524,47 @@ with st.sidebar:
 
     st.markdown("""
     <style>
-    /* Barre de navigation */
+    /* --- Barre de navigation blanche --- */
     .navbar {
-        background-color: #0e1117;
+        background-color: #ffffff;
         overflow: hidden;
-        border-radius: 8px;
+        border-radius: 10px;
         padding: 10px 0;
         text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
 
-    /* Liens */
+    /* --- Liens (boutons) --- */
     .navbar a {
-        float: none;
         display: inline-block;
-        color: #f2f2f2;
+        background-color: #ffb6c1; /* rose clair */
+        color: #ffffff; /* texte blanc */
         text-align: center;
-        padding: 14px 20px;
+        padding: 10px 18px;
+        margin: 4px;
+        border-radius: 8px;
         text-decoration: none;
-        font-size: 18px;
-        transition: background 0.3s, color 0.3s;
-        border-radius: 6px;
-        margin: 0 4px;
+        font-size: 17px;
+        font-weight: 500;
+        transition: all 0.3s ease;
     }
 
-    /* Effet au survol */
+    /* --- Effet hover (survol) --- */
     .navbar a:hover {
-        background-color: #575757;
-        color: #fff;
+        background-color: #ff69b4; /* rose vif au survol */
+        transform: scale(1.05);
     }
 
-    /* Lien actif */
+    /* --- Bouton actif (page actuelle) --- */
     .navbar a.active {
-        background-color: #04AA6D;
+        background-color: #ff1493; /* rose profond */
         color: white;
+        font-weight: bold;
     }
     </style>
 
     <div class="navbar">
-        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
+        <a href="https://abel123.pythonanywhere.com/accueil" class="active">Accueil</a>
         <a href="https://abel123.pythonanywhere.com/about">À propos</a>
         <a href="https://abel123.pythonanywhere.com/chatbot">Chatbot</a>
         <a href="https://abel123.pythonanywhere.com/predictor">Prédiction</a>
@@ -569,37 +572,6 @@ with st.sidebar:
     </div>
 """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="api-info">
-        <h4>📝 Exemple JavaScript</h4>
-        <div class="api-code">
-const question = "Symptômes cancer sein";<br>
-const url = `{URL}/?api=true&question=${encodeURIComponent(question)}`;<br>
-<br>
-fetch(url)<br>
-&nbsp;&nbsp;.then(res => res.json())<br>
-&nbsp;&nbsp;.then(data => console.log(data.answer));
-        </div>
-    </div>
-    """.replace("{URL}", app_url), unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="api-info">
-        <h4>🐍 Exemple Python</h4>
-        <div class="api-code">
-import requests<br>
-import urllib.parse<br>
-<br>
-question = "Symptômes cancer sein"<br>
-url = f"{URL}/?api=true&question={urllib.parse.quote(question)}"<br>
-<br>
-response = requests.get(url)<br>
-data = response.json()<br>
-print(data['answer'])
-        </div>
-    </div>
-    """.replace("{URL}", app_url), unsafe_allow_html=True)
-    
     st.markdown("---")
     
     st.markdown("""
