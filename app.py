@@ -484,8 +484,60 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+def afficher_navbar():
+    st.markdown("""
+    <style>
+    /* --- Barre de navigation blanche --- */
+    .navbar {
+        background-color: #ffffff;
+        overflow: hidden;
+        border-radius: 10px;
+        padding: 10px 0;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
 
+    /* --- Liens (boutons) --- */
+    .navbar a {
+        display: inline-block;
+        background-color: #ffb6c1; /* rose clair */
+        color: #ffffff; /* texte blanc */
+        text-align: center;
+        padding: 10px 18px;
+        margin: 4px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 17px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    /* --- Effet hover (survol) --- */
+    .navbar a:hover {
+        background-color: #ff1493; /* rose vif au survol */
+        transform: scale(1.05);
+        color: white;
+        font-weight: bold;
+    }
+
+    /* --- Bouton actif (page actuelle) --- */
+    .navbar a.active {
+        background-color: #ff1493; /* rose profond */
+        color: white;
+        font-weight: bold;
+    }
+    </style>
+
+    <div class="navbar">
+        <a href="https://abel123.pythonanywhere.com/" class="active">Accueil</a>
+        <a href="https://abel123.pythonanywhere.com/a-propos/">À propos</a>
+        <a href="https://anontchigan-api.streamlit.app/">Chatbot</a>
+        <a href="https://abel123.pythonanywhere.com/predictor/">Prédiction</a>
+        <a href="https://abel123.pythonanywhere.com/contact/">Contact</a>
+    </div>
+""", unsafe_allow_html=True)
 # Header
+afficher_navbar()
 st.markdown("""
 <div class="main-header">
     <h1>💗 ANONTCHIGAN </h1>
