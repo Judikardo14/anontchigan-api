@@ -654,10 +654,10 @@ nav {
 <div style="padding: 0 1rem;">
 <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Questions fréquentes :</p>
 <div class="quick-questions">
-<button class="quick-question-btn" data-question="Quels sont les symptômes du cancer du sein ?">Symptômes</button>
-<button class="quick-question-btn" data-question="Comment faire l'auto-examen des seins ?">Auto-examen</button>
-<button class="quick-question-btn" data-question="Quels sont les facteurs de risque ?">Facteurs de risque</button>
-<button class="quick-question-btn" data-question="À partir de quel âge faire un dépistage ?">Âge de dépistage</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les symptômes du cancer du sein ?')">Symptômes</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Comment faire l\\'auto-examen des seins ?')">Auto-examen</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les facteurs de risque ?')">Facteurs de risque</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('À partir de quel âge faire un dépistage ?')">Âge de dépistage</button>
 </div>
 </div>
 
@@ -676,7 +676,7 @@ nav {
 <div class="chat-input-container">
 <div class="chat-input-wrapper">
 <textarea id="chatInput" class="chat-input" placeholder="Posez votre question ici..." rows="1"></textarea>
-<button class="send-button" id="sendButton"><i class="fas fa-paper-plane"></i></button>
+<button class="send-button" id="sendButton" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
 </div>
 </div>
 </div>
@@ -715,25 +715,14 @@ if (chatInput) {
     });
 }
 
-if (sendButton) {
-    sendButton.addEventListener('click', function(e) {
-        e.preventDefault();
+function sendQuickQuestion(question) {
+    if (chatInput) {
+        chatInput.value = question;
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
         sendMessage();
-    });
+    }
 }
-
-document.querySelectorAll('.quick-question-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        const question = this.getAttribute('data-question');
-        if (chatInput && question) {
-            chatInput.value = question;
-            chatInput.style.height = 'auto';
-            chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-            sendMessage();
-        }
-    });
-});
 
 async function sendMessage() {
     const message = chatInput.value.trim();
@@ -748,11 +737,16 @@ async function sendMessage() {
     scrollToBottom();
 
     try {
-        const baseUrl = window.parent.location.origin;
-        const apiUrl = baseUrl + '/?api=true&question=' + encodeURIComponent(message);
+        const currentUrl = window.location.href;
+        const baseUrl = currentUrl.split('?')[0];
+        const apiUrl = baseUrl + '?api=true&question=' + encodeURIComponent(message);
+        
+        console.log('Envoi de la requête à:', apiUrl);
         
         const response = await fetch(apiUrl);
         const data = await response.json();
+
+        console.log('Réponse reçue:', data);
 
         typingIndicator.classList.remove('active');
 
@@ -760,13 +754,13 @@ async function sendMessage() {
             const sourceText = getSourceText(data.method);
             addMessage(data.answer, 'bot', sourceText, data.method);
         } else {
-            addMessage("❌ Impossible de récupérer une réponse.", 'bot');
+            addMessage("❌ Impossible de récupérer une réponse. Erreur: " + (data.error || 'inconnue'), 'bot');
         }
 
     } catch (error) {
         typingIndicator.classList.remove('active');
-        addMessage("❌ Erreur de connexion. Veuillez réessayer.", 'bot');
-        console.error('Erreur:', error);
+        addMessage("❌ Erreur de connexion. Veuillez réessayer. Détails: " + error.message, 'bot');
+        console.error('Erreur complète:', error);
     }
 
     chatInput.disabled = false;
@@ -852,7 +846,10 @@ function scrollToBottom() {
 }
 
 window.addEventListener('load', () => {
-    if (chatInput) chatInput.focus();
+    if (chatInput) {
+        chatInput.focus();
+        console.log('Interface chargée et prête');
+    }
 });
 </script>
 </body>
