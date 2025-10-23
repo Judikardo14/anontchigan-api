@@ -1039,9 +1039,11 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = f"user_{random.randint(1000, 9999)}"
 
 if "conversation_history" not in st.session_state:
-    st.markdown('<a href="/" target="_blank">Accueil</a>', unsafe_allow_html=True)
+    st.session_state.conversation_history = []
+<ul class="nav-menu" id="navMenu">
+<li><a href="https://abel123.pythonanywhere.com/" target="_blank">Accueil</a></li>
 <li><a href="https://abel123.pythonanywhere.com/a-propos/" target="_blank">À Propos</a></li>
 <li><a href="#" class="active">Chatbot</a></li>
 <li><a href="https://abel123.pythonanywhere.com/predictor/" target="_blank">Prédiction</a></li>
-st.markdown('<li><a href="https://abel123.pythonanywhere.me/" target="_blank">Accueil</a></li>', unsafe_allow_html=True)
-
+<li><a href="https://abel123.pythonanywhere.com/contact/" target="_blank">Contact</a></li>
+</ul>
