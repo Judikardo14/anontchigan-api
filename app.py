@@ -541,7 +541,8 @@ afficher_navbar()
 st.markdown("---")
 st.markdown("""
 <div class="main-header">
-    <h1>💗 ANONTCHIGAN Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯 </h1>
+    <h1>💗 ANONTCHIGAN </h1>
+    <p>Assistante IA pour la sensibilisation au cancer du sein au Bénin 🇧🇯</p>
 </div>
 """, unsafe_allow_html=True)
 
