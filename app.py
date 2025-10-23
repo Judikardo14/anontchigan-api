@@ -24,6 +24,43 @@ st.set_page_config(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ANONTCHIGAN")
 
+# ============================================
+# MASQUAGE DES ÉLÉMENTS STREAMLIT
+# ============================================
+
+hide_streamlit_style = """
+<style>
+    /* Masquer le menu hamburger */
+    #MainMenu {visibility: hidden;}
+    
+    /* Masquer le footer "Made with Streamlit" */
+    footer {visibility: hidden;}
+    
+    /* Masquer le header */
+    header {visibility: hidden;}
+    
+    /* Masquer le bouton "Deploy" */
+    .stDeployButton {display: none;}
+    
+    /* Masquer le lien GitHub */
+    .viewerBadge_container__1QSob {display: none;}
+    
+    /* Masquer l'icône GitHub */
+    .viewerBadge_link__1S137 {display: none;}
+    
+    /* Masquer tous les badges */
+    .stApp header {display: none;}
+    
+    /* Style pour cacher complètement le header */
+    div[data-testid="stToolbar"] {display: none;}
+    
+    /* Cacher le bouton fork */
+    button[title="View source on GitHub"] {display: none;}
+</style>
+"""
+
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 class Config:
     """Configuration optimisée"""
     SIMILARITY_THRESHOLD = 0.75
