@@ -1,4 +1,9 @@
-import json
+<div class="quick-questions">
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les symptômes du cancer du sein ?')">Symptômes</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Comment faire l\'auto-examen des seins ?')">Auto-examen</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('Quels sont les facteurs de risque ?')">Facteurs de risque</button>
+<button class="quick-question-btn" onclick="sendQuickQuestion('À partir de quel âge faire un dépistage ?')">Âge de dépistage</button>
+</div>import json
 import os
 import logging
 from typing import Dict, List, Optional
@@ -704,60 +709,32 @@ window.addMessage = function(text, sender, source, sourceType) {
     window.scrollToBottom();
 }
 
-// Fonction pour formater les messages
-function formatMessage(text) {
+// Fonction pour formater les messages (GLOBALE)
+window.formatMessage = function(text) {
     if (!text) return '';
     
-    // Remplacer les balises markdown
-    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-    
-    // Remplacer les sauts de ligne
-    text = text.replace(/\n/g, '<br>');
-    
-    // Convertir les listes numérotées
-    const lines = text.split('<br>');
-    let inList = false;
-    let result = [];
-    
-    for (let line of lines) {
-        if (/^\d+\.\s+/.test(line)) {
-            if (!inList) {
-                result.push('<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">');
-                inList = true;
-            }
-            result.push('<li>' + line.replace(/^\d+\.\s+/, '') + '</li>');
-        } else if (/^[-•]\s+/.test(line)) {
-            if (!inList) {
-                result.push('<ul style="margin: 0.5rem 0 0.5rem 1.5rem;">');
-                inList = true;
-            }
-            result.push('<li>' + line.replace(/^[-•]\s+/, '') + '</li>');
-        } else {
-            if (inList) {
-                result.push('</ul>');
-                inList = false;
-            }
-            result.push(line);
-        }
+    try {
+        // Échapper les caractères spéciaux HTML d'abord
+        var div = document.createElement('div');
+        div.textContent = text;
+        text = div.innerHTML;
+        
+        // Remplacer les sauts de ligne par <br>
+        text = text.replace(/\n/g, '<br>');
+        
+        // Styliser les emojis
+        text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
+        text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
+        text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
+        
+        return text;
+    } catch (e) {
+        console.error('Erreur formatMessage:', e);
+        return text || '';
     }
-    
-    if (inList) {
-        result.push('</ul>');
-    }
-    
-    text = result.join('');
-    
-    // Styliser les emojis
-    text = text.replace(/💗/g, '<span style="color: #E91E63;">💗</span>');
-    text = text.replace(/👋/g, '<span style="font-size: 1.2em;">👋</span>');
-    text = text.replace(/🌸/g, '<span style="font-size: 1.1em;">🌸</span>');
-    
-    return text;
 }
-
-// Fonction pour obtenir le texte de la source
-function getSourceText(method) {
+// Fonction pour obtenir le texte de la source (GLOBALE)
+window.getSourceText = function(method) {
     const map = {
         'salutation': '🤝 Accueil',
         'json_direct': '📚 Base FAQ',
@@ -769,28 +746,71 @@ function getSourceText(method) {
     return map[method] || '💗 ANONTCHIGAN';
 }
 
-// Fonction pour scroller vers le bas
-function scrollToBottom() {
-    if (chatMessages) {
-        setTimeout(() => {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+// Fonction pour scroller vers le bas (GLOBALE)
+window.scrollToBottom = function() {
+    if (window.chatMessages) {
+        setTimeout(function() {
+            window.chatMessages.scrollTop = window.chatMessages.scrollHeight;
         }, 100);
     }
+}
+
+// ============================================
+// CRÉER DES ALIAS GLOBAUX POUR LE HTML
+// ============================================
+function sendMessage() {
+    return window.sendMessage();
+}
+
+function sendQuickQuestion(question) {
+    return window.sendQuickQuestion(question);
+}
+
+function toggleMenu() {
+    return window.toggleMenu();
+}
+
+function addMessage(text, sender, source, sourceType) {
+    return window.addMessage(text, sender, source, sourceType);
+}
+
+function formatMessage(text) {
+    return window.formatMessage(text);
+}
+
+function getSourceText(method) {
+    return window.getSourceText(method);
+}
+
+function scrollToBottom() {
+    return window.scrollToBottom();
 }
 
 // Initialisation au chargement du DOM
 document.addEventListener('DOMContentLoaded', function() {
     // Récupération des éléments
-    chatMessages = document.getElementById('chatMessages');
-    chatInput = document.getElementById('chatInput');
-    sendButton = document.getElementById('sendButton');
-    typingIndicator = document.getElementById('typingIndicator');
+    window.chatMessages = document.getElementById('chatMessages');
+    window.chatInput = document.getElementById('chatInput');
+    window.sendButton = document.getElementById('sendButton');
+    window.typingIndicator = document.getElementById('typingIndicator');
     
-    console.log('✅ Éléments récupérés:', { chatMessages, chatInput, sendButton, typingIndicator });
+    console.log('✅ Éléments récupérés:', { 
+        chatMessages: !!window.chatMessages, 
+        chatInput: !!window.chatInput, 
+        sendButton: !!window.sendButton, 
+        typingIndicator: !!window.typingIndicator 
+    });
+
+    // Vérifier que les fonctions sont accessibles
+    console.log('✅ Fonctions disponibles:', {
+        sendMessage: typeof sendMessage,
+        sendQuickQuestion: typeof sendQuickQuestion,
+        toggleMenu: typeof toggleMenu
+    });
 
     // Menu navigation
-    document.querySelectorAll('.nav-menu a').forEach(link => {
-        link.addEventListener('click', () => {
+    document.querySelectorAll('.nav-menu a').forEach(function(link) {
+        link.addEventListener('click', function() {
             if (window.innerWidth <= 768) {
                 const menu = document.getElementById('navMenu');
                 if (menu) menu.classList.remove('active');
@@ -799,20 +819,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Chat input auto-resize
-    if (chatInput) {
-        chatInput.addEventListener('input', function() {
+    if (window.chatInput) {
+        window.chatInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
         
-        chatInput.addEventListener('keydown', function(event) {
+        window.chatInput.addEventListener('keydown', function(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 sendMessage();
             }
         });
         
-        chatInput.focus();
+        window.chatInput.focus();
         console.log('✅ Interface chargée et prête');
     }
 });
