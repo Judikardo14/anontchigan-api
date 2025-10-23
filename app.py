@@ -79,6 +79,31 @@ hide_streamlit_style = """
     /* Masquer tous les éléments de type badge */
     [class*="viewerBadge"] {display: none !important;}
     
+    /* Masquer la section en bas avec photo GitHub et logo Streamlit */
+    .stChatMessage footer {display: none !important;}
+    [data-testid="stChatMessageFooter"] {display: none !important;}
+    
+    /* Masquer tout élément contenant "Hosted with" */
+    div:has(> a[href*="streamlit.io"]) {display: none !important;}
+    
+    /* Masquer la ligne du bas avec les infos Streamlit */
+    .st-emotion-cache-1y4p8pa {display: none !important;}
+    .st-emotion-cache-1wmy9hl {display: none !important;}
+    
+    /* Masquer spécifiquement la zone du footer dans les messages */
+    .stChatMessage > div:last-child {display: none !important;}
+    
+    /* Alternative: masquer tous les footers dans l'app */
+    .main footer, .stApp footer {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        overflow: hidden !important;
+    }
+    
+    /* Masquer le container du badge viewer */
+    [data-testid="stAppViewBlockContainer"] footer {display: none !important;}
+    
     /* Réduire l'espace en haut */
     .block-container {
         padding-top: 1rem;
