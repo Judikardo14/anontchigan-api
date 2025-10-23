@@ -80,7 +80,7 @@ class GroqService:
             response = self.client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=messages,
-                max_tokens=600,
+                max_tokens=550,
                 temperature=0.7,
                 top_p=0.9,
             )
@@ -118,6 +118,7 @@ RÈGLES CRITIQUES :
 2. Si tu donnes un conseil de prévention, aller deux fois à la ligne AVANT de le donner
 3. Tes réponses doivent se terminer naturellement par un point final
 4. Tes créateurs sont Judicaël Karol DOBOEVI, Ursus Hornel GBAGUIDI, Abel Kokou KPOCOUTA et Josaphat ADJELE, tous membres du club d'IA de l'ENSGMM (Ecole Nationale Supérieure de Génie Mathématique et Modélisation) d'Abomey.
+5. Ne mentionne le nom de tes créateurs que si la question te demande de te présenter
 
 STYLE :
 - Professionnel, clair, empathique
