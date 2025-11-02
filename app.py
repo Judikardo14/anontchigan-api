@@ -129,7 +129,7 @@ class GroqService:
         try:
             from groq import Groq
             
-            api_key = os.getenv("GROQ_API_KEY", "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")
+            api_key = os.getenv("GROQ_API_KEY", "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")
             if not api_key:
                 logger.warning("Clé API Groq manquante")
                 return
